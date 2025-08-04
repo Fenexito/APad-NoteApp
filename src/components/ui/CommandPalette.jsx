@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import * as Command from "@cmdk/react";
+import * as Command from "cmdk";
 import { useNavigate } from "react-router-dom";
 
 export default function CommandPalette() {
