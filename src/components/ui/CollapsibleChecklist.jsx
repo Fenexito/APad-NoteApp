@@ -1,7 +1,6 @@
-
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useFormStore } from "../../store/useFormStore";
-import Button from "./Button";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 const ITEMS = [
   "Greeted customer",
@@ -15,20 +14,28 @@ export default function CollapsibleChecklist() {
   const [open, setOpen] = useState(false);
   const checklist = useFormStore((s) => s.data.checklist);
   const toggle = useFormStore((s) => s.toggleChecklistItem);
+  const ref = useRef(null);
 
-  const allDone = ITEMS.every((i) => checklist[i]);
+  // Auto‑collapse when all done
+  useEffect(() => {
+    if (open && ITEMS.every((i) => checklist[i])) setOpen(false);
+  }, [checklist, open]);
 
   return (
-    <div className="rounded border p-4">
+    <div className="rounded-2xl bg-white shadow dark:bg-gray-800">
       <button
-        className="flex w-full items-center justify-between font-semibold"
+        className="flex w-full items-center justify-between px-4 py-3 text-left font-medium"
         onClick={() => setOpen(!open)}
       >
-        Excellence Mandate {allDone && "✅"}
-        <span>{open ? "▲" : "▼"}</span>
+        <span>Excellence Mandate</span>
+        {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
       </button>
-      {open && (
-        <ul className="mt-3 space-y-2 text-sm">
+      <div
+        ref={ref}
+        style={{ maxHeight: open ? ref.current?.scrollHeight : 0 }}
+        className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
+      >
+        <ul className="space-y-2 px-4 pb-4 text-sm">
           {ITEMS.map((item) => (
             <li key={item} className="flex items-center gap-2">
               <input
@@ -36,11 +43,11 @@ export default function CollapsibleChecklist() {
                 checked={!!checklist[item]}
                 onChange={() => toggle(item)}
               />
-              <span className={checklist[item] ? "line-through" : ""}>{item}</span>
+              <span className={checklist[item] ? "line-through opacity-60" : ""}>{item}</span>
             </li>
           ))}
         </ul>
-      )}
+      </div>
     </div>
   );
 }

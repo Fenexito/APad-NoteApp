@@ -6,6 +6,7 @@ import Button from "../ui/Button";
 import ModalFull from "../ui/ModalFull";
 import ModalSplit from "../ui/ModalSplit";
 import CollapsibleChecklist from "../ui/CollapsibleChecklist";
+import FormSection from "../ui/FormSection";
 
 export default function FullForm() {
   const data = useFormStore((s) => s.data);
@@ -41,38 +42,36 @@ export default function FullForm() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[600px] space-y-8 p-4">
-      {/* Customer Info */}
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Customer Information</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
+    <div className="mx-auto w-full max-w-[600px] space-y-6 px-4 pb-10">
+      <FormSection title="Customer Information">
+        <div className="grid gap-4 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
           {fields.map((f) => (
             <label
               key={f.key}
-              className={`flex flex-col gap-1 text-sm ${f.span === 2 ? "sm:col-span-2" : ""}`}
+              className={`flex flex-col gap-1 text-xs font-medium ${f.span === 2 ? "sm:col-span-2 md:col-span-4" : ""}`}
             >
               {f.label}
               <input
                 name={f.key}
                 value={data.customer[f.key]}
                 onChange={handleChange}
-                className="rounded border px-3 py-2 dark:bg-gray-800"
+                className="rounded-lg border px-3 py-2 text-sm dark:bg-gray-800"
               />
             </label>
           ))}
         </div>
-      </section>
+      </FormSection>
 
       {/* Placeholder for other sections */}
-      <section className="rounded border bg-yellow-50 p-4 text-sm dark:bg-yellow-900/20">
-        Sections Issue Details, System Inspection, and Resolution will be migrated next.
-      </section>
+      <FormSection title="Issue Details / Inspection / Resolution">
+        <p className="text-sm text-gray-500">Sections will be migrated next.</p>
+      </FormSection>
 
       <CollapsibleChecklist />
 
       <div className="flex justify-end">
         <Button
-          className="bg-green-600 text-white dark:bg-green-500"
+          className="rounded-lg bg-green-600 px-6 py-2 text-white shadow-md dark:bg-green-500"
           onClick={openPreview}
         >
           Preview Note
