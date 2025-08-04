@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-
+import { useState } from "react";
 export default function useDisplayName() {
   const [name, setName] = useState(() => localStorage.getItem("agentName") || "");
   const save = (val) => {
