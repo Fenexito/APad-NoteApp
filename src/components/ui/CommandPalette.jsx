@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import * as Command from "cmdk";
+import { Command } from "cmdk";
 import { useNavigate } from "react-router-dom";
 
 export default function CommandPalette() {
@@ -20,7 +20,7 @@ export default function CommandPalette() {
   }, []);
 
   return (
-    <Command.Command
+    <Command
       id="cmdk-root"
       onKeyDownCapture={handleKeyDown}
       className="cmdk absolute left-1/2 top-24 z-[60] hidden w-[90vw] max-w-xl -translate-x-1/2 overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-gray-800"
@@ -34,6 +34,6 @@ export default function CommandPalette() {
           </Command.Item>
         ))}
       </Command.List>
-    </Command.Command>
+    </Command>
   );
 }
