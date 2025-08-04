@@ -7,9 +7,9 @@ module.exports = {
         sans: ["'Source Sans Pro'", "ui-sans-serif", "system-ui"],
       },
       screens: {
-        xs: "400px", // min‑width 400
-        sm: "500px", // min‑width 500
-        md: "600px", // min‑width 600
+        xs: "350px", // min‑width 350
+        sm: "450px", // min‑width 450
+        md: "550px", // min‑width 550
       },
     },
   },
