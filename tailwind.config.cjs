@@ -7,8 +7,8 @@ module.exports = {
         sans: ["'Source Sans Pro'", "ui-sans-serif", "system-ui"],
       },
       screens: {
-        xs: "350px", // 3 → 4 cols
-        md: "550px", // container cap
+        xs: "350px",
+        md: "550px",
       },
     },
   },

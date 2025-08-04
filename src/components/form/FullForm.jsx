@@ -2,11 +2,14 @@ import { useFormStore } from "../../store/useFormStore";
 import { buildNote } from "../../utils/noteBuilder";
 import { splitNote } from "../../utils/splitNote";
 import { useState, useMemo } from "react";
+import { Clipboard } from "lucide-react";
 import Button from "../ui/Button";
 import ModalFull from "../ui/ModalFull";
 import ModalSplit from "../ui/ModalSplit";
 import FormSection from "../ui/FormSection";
 import MandatePanel from "../ui/MandatePanel";
+
+const copy = (txt) => navigator.clipboard.writeText(txt);
 
 export default function FullForm() {
   const data = useFormStore((s) => s.data);
@@ -22,7 +25,6 @@ export default function FullForm() {
     parts.length === 1 ? setShowFull(true) : setShowSplit(true);
   };
 
-  // conditional visibility
   const showXid = data.customer.caller === "Consultation";
   const showSecQ = ["Security Questions", "Manual Auth"].includes(
     data.customer.verifiedBy
@@ -36,30 +38,34 @@ export default function FullForm() {
   return (
     <div className="mx-auto w-full max-w-[550px] space-y-3 px-2 pb-6">
       <FormSection title="Customer Information">
-        <div className="grid grid-cols-3 xs:grid-cols-4 gap-2">
-          {/* Row 1 */}
+        <div className="grid auto-cols-fr grid-flow-col grid-cols-3 xs:grid-cols-4 gap-2">
           {[
             ["BAN", "ban"],
             ["CID", "cid"],
             ["NAME", "name"],
             ["CBR", "cbr"],
           ].map(([label, key]) => (
-            <label
-              key={key}
-              className="flex flex-col gap-0.5 text-[10px] font-semibold uppercase"
-            >
-              {label}
+            <div key={key} className="relative flex flex-col gap-0.5 text-[10px] font-semibold uppercase">
+              <span>{label}</span>
               <input
                 name={key}
                 value={data.customer[key]}
                 onChange={handleChange("customer")}
                 className="rounded border px-1 py-0.5 text-[11px] dark:bg-gray-800"
-                autoComplete="off"
+                autoComplete="new-password"
               />
-            </label>
+              <button
+                type="button"
+                onClick={() => copy(data.customer[key] || "")}
+                className="absolute right-0 top-0.5 text-gray-500 hover:text-black dark:hover:text-white"
+                aria-label={`Copy ${label}`}
+              >
+                <Clipboard size={10} />
+              </button>
+            </div>
           ))}
 
-          {/* Row 2 static fields */}
+          {/* Row 2 dynamic */}
           <label className="flex flex-col gap-0.5 text-[10px] font-semibold uppercase">
             CALLER
             <select
@@ -97,21 +103,35 @@ export default function FullForm() {
             </select>
           </label>
 
-          {/* Conditional SECURITY QUESTIONS */}
           {showSecQ && (
             <label className="flex flex-col gap-0.5 text-[10px] font-semibold uppercase">
               SECURITY QUESTIONS
-              <input
+              <select
+                multiple
                 name="securityQuestions"
-                value={data.customer.securityQuestions}
-                onChange={handleChange("customer")}
+                value={data.customer.securityQuestions.split(",")}
+                onChange={(e) =>
+                  handleChange("customer")({
+                    target: {
+                      name: "securityQuestions",
+                      value: Array.from(e.target.selectedOptions).map((o) => o.value).join(","),
+                    },
+                  })
+                }
                 className="rounded border px-1 py-0.5 text-[11px] dark:bg-gray-800"
-                autoComplete="off"
-              />
+              >
+                <option>DOB</option>
+                <option>SIN</option>
+                <option>DL</option>
+                <option>CC</option>
+                <option>Primary Phone #</option>
+                <option>Secondary Phone #</option>
+                <option>Email Address</option>
+                <option>Billing Address & Postal Code</option>
+              </select>
             </label>
           )}
 
-          {/* Conditional XID */}
           {showXid && (
             <label className="flex flex-col gap-0.5 text-[10px] font-semibold uppercase">
               XID
@@ -120,12 +140,11 @@ export default function FullForm() {
                 value={data.customer.xid}
                 onChange={handleChange("customer")}
                 className="rounded border px-1 py-0.5 text-[11px] dark:bg-gray-800"
-                autoComplete="off"
+                autoComplete="new-password"
               />
             </label>
           )}
 
-          {/* ADDRESS always present */}
           <label className="flex flex-col gap-0.5 text-[10px] font-semibold uppercase">
             ADDRESS
             <input
@@ -133,23 +152,21 @@ export default function FullForm() {
               value={data.customer.address}
               onChange={handleChange("customer")}
               className="rounded border px-1 py-0.5 text-[11px] dark:bg-gray-800"
-              autoComplete="off"
+              autoComplete="new-password"
             />
           </label>
         </div>
 
-        {/* Mandate switches panel */}
-        <div className="mt-3">
+        <div className="mt-2">
           <MandatePanel />
         </div>
       </FormSection>
 
-      {/* Placeholder for next big sections */}
       <FormSection title="Issue Details / Inspection / Resolution">
         <p className="text-xs text-gray-500">Sections will be migrated next.</p>
       </FormSection>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end pt-1">
         <Button
           className="rounded-md bg-green-600 px-5 py-1.5 text-white shadow-sm dark:bg-green-500"
           onClick={openPreview}
@@ -158,17 +175,8 @@ export default function FullForm() {
         </Button>
       </div>
 
-      {/* Modals */}
-      <ModalFull
-        open={showFull}
-        onClose={() => setShowFull(false)}
-        text={noteText}
-      />
-      <ModalSplit
-        open={showSplit}
-        onClose={() => setShowSplit(false)}
-        parts={parts}
-      />
+      <ModalFull open={showFull} onClose={() => setShowFull(false)} text={noteText} />
+      <ModalSplit open={showSplit} onClose={() => setShowSplit(false)} parts={parts} />
     </div>
   );
 }
