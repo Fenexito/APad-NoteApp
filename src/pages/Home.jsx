@@ -1,9 +1,9 @@
-import Wizard from "../components/form/Wizard";
+import FullForm from "../components/form/FullForm";
 
 export default function Home() {
   return (
-    <div className="mx-auto max-w-4xl p-6">
-      <Wizard />
+    <div className="flex justify-center">
+      <FullForm />
     </div>
   );
 }

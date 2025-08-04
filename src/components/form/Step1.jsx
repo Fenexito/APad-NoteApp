@@ -1,4 +1,4 @@
-import { useWizardStore } from "../../store/useWizardStore";
+import { useWizardStore } from "../../store/useFormStore";
 import Button from "../ui/Button";
 
 export default function Step1() {

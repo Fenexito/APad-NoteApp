@@ -1,4 +1,4 @@
-import { useWizardStore } from "../../store/useWizardStore";
+import { useWizardStore } from "../../store/useFormStore";
 import Step1 from "./Step1";
 import StepPlaceholder from "./StepPlaceholder";
 import { buildNote } from "../../utils/noteBuilder";
