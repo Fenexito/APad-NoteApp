@@ -1,89 +1,89 @@
 import create from "zustand";
 
 export const useFormStore = create((set) => ({
+  /* ═════════════ STATE ═════════════ */
   data: {
-    /* ---------------------------------------------------- */
-    /* 1. Customer                                          */
-    /* ---------------------------------------------------- */
-    customer: {
-      ban: "",
-      cid: "",
-      name: "",
-      cbr: "",
-      caller: "",
-      verifiedBy: "",
-      securityQuestions: "",
-      address: "",
-      xid: "",
-      phone: "",
-      accountId: "",
-    },
+    /* 1. Customer */
+    customer: { ban:"", cid:"", name:"", cbr:"", caller:"", verifiedBy:"", securityQuestions:"",
+                address:"", xid:"", phone:"", accountId:"" },
 
-    /* ---------------------------------------------------- */
-    /* 2. Issue Details / Inspection / Resolution (NEW)     */
-    /* ---------------------------------------------------- */
+    /* 2. Issue Details / Inspection / Resolution */
     issue: {
-      cxIssue: "",          // Texto libre – descripción del problema
-      serviceOnCsr: "",     // Active, Pending, etc.
-      errorType: "",        // "", "outage", "ncError"
-      errorDetails: "",     // Info obligatoria si hay error
+      cxIssue:"", serviceOnCsr:"", errorType:"", errorDetails:"",
+      technology:"", service:"", workflow:"", affected:"",
+      equipSummary:"", troubleshooting:"",
+      /* AWA / diagnostics (sección 3) */
+      awaSteps:"", spTests:[
+        { stage:"Before", down:"", up:"", wired:false },
+        { stage:"After",  down:"", up:"", wired:false },
+      ],
+      devicesActive:"", devicesTotal:"",
+      tvsUsed:"", tvsKey:"",
     },
 
-    /* ---------------------------------------------------- */
-    /* 3. Technical Problem                                 */
-    /* ---------------------------------------------------- */
-    problem: {
-      services: [],
-      equipment: "",
-      connections: [],
-      steps: [],
-    },
+    /* 3. AWA alerts seleccionadas */
+    alerts: [],
 
-    /* ---------------------------------------------------- */
-    /* 4. Inspection                                        */
-    /* ---------------------------------------------------- */
-    inspection: {
-      featureName: "",
-      findings: "",
-    },
+    /* 4. Technical Problem */
+    problem: { services:[], equipment:"", connections:[], steps:[] },
 
-    /* ---------------------------------------------------- */
-    /* 5. Resolution                                        */
-    /* ---------------------------------------------------- */
+    /* 5. Inspection */
+    inspection: { featureName:"", findings:"" },
+
+    /* 6. Resolution (Sección 4) */
     resolution: {
-      status: "Pending",
-      ticketId: "",
-      summary: "",
+      outcome:"",          // "Resolved" | "Tech" | "Ticket" | "Transfer" | …
+      /* Campos solo cuando outcome === "Tech" */
+      techCbr:"", techDate:"", techTime:"", techAoc:"",
+      /* outcome === "Ticket" */
+      ticketSpecial:"",
+      /* outcome === "Transfer" */
+      transferDept:"",
+      /* siempre */
+      ticketFinal:"",      // obligatorio
+      csrOrder:"",         // opcional
     },
 
-    /* ---------------------------------------------------- */
-    /* 6. Checklist                                         */
-    /* ---------------------------------------------------- */
+    /* 7. Excellence checklist (sección 1) */
     checklist: {},
   },
 
-  /* ------------------------------------------------------ */
-  /* Actualiza cualquier sección                            */
-  /* ------------------------------------------------------ */
+  /* ═════════════ ACTIONS ═════════════ */
   updateSection: (section, payload) =>
-    set((state) => ({
+    set((s) => ({ data: { ...s.data, [section]: { ...s.data[section], ...payload } } })),
+
+  toggleChecklistItem: (key) =>
+    set((s) => ({ data: { ...s.data, checklist: { ...s.data.checklist, [key]: !s.data.checklist[key] } } })),
+
+  /* AWA alerts */
+  toggleAlert: (key) =>
+    set((s) => ({
       data: {
-        ...state.data,
-        [section]: { ...state.data[section], ...payload },
+        ...s.data,
+        alerts: s.data.alerts.includes(key)
+          ? s.data.alerts.filter((k) => k !== key)
+          : [...s.data.alerts, key],
       },
     })),
+  clearAlerts: () => set((s) => ({ data: { ...s.data, alerts: [] } })),
 
-  /* ------------------------------------------------------ */
-  /* Marca / desmarca ítems del checklist                   */
-  /* ------------------------------------------------------ */
-  toggleChecklistItem: (key) =>
-    set((state) => ({
+  /* SpeedTests helpers */
+  addSpeedTest: () =>
+    set((s) => ({
       data: {
-        ...state.data,
-        checklist: {
-          ...state.data.checklist,
-          [key]: !state.data.checklist[key],
+        ...s.data,
+        issue: {
+          ...s.data.issue,
+          spTests: [
+            ...s.data.issue.spTests,
+            { stage:`Test ${s.data.issue.spTests.length+1}`, down:"", up:"", wired:false },
+          ],
         },
       },
     })),
+  updateSpeedTest: (idx, field, val) =>
+    set((s) => {
+      const sp=[...s.data.issue.spTests]; sp[idx]={...sp[idx],[field]:val};
+      return { data:{ ...s.data, issue:{ ...s.data.issue, spTests:sp } } };
+    }),
 }));

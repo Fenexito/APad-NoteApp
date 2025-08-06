@@ -98,7 +98,7 @@ export default function Section1() {
         onClick={() => setOpenCust(!openCust)}
       >
         <h3 className="flex-1 text-sm font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">
-          Customer Information
+          ACCOUNT INFO & VERIFICATION
         </h3>
         <div
           className="flex items-center gap-2"
