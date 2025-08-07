@@ -8,7 +8,7 @@ import {
 import { useFormStore } from "../../../store/useFormStore";
 import MultiCheckboxPopover from "../../ui/MultiCheckboxPopover";
 import FormSection from "../../ui/FormSection";
-import MandatePanel from "../../ui/MandatePanel";
+import CollapsibleChecklist from "../../ui/CollapsibleChecklist";
 
 export default function Section1() {
   // Zustand store
@@ -240,7 +240,7 @@ export default function Section1() {
           </div>
 
           <div className="mt-2">
-            <MandatePanel />
+            <CollapsibleChecklist section={1} />
           </div>
         </>
       )}

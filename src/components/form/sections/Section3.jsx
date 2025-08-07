@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useFormStore } from "../../../store/useFormStore";
 import FormSection from "../../ui/FormSection";
+import CollapsibleChecklist from "../../ui/CollapsibleChecklist";
 
 /* ───────── AWA Alert catalog ───────── */
 const ALL_ALERTS = [
@@ -374,6 +375,11 @@ export default function Section3() {
               )}
             </div>
           )}
+
+          {/* ███ Excellence Mandate – Sección 3 ███ */}
+          <div className="mt-2">
+            <CollapsibleChecklist section={3} />
+          </div>
         </>
       )}
     </FormSection>

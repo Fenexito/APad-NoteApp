@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useFormStore } from "../../../store/useFormStore";
 import FormSection from "../../ui/FormSection";
-import MandatePanel from "../../ui/MandatePanel";
+import CollapsibleChecklist from "../../ui/CollapsibleChecklist";
 
 /* ═══════════════════════════════════════
    1. CONSTANTES GLOBALES
@@ -1032,7 +1032,7 @@ export default function Section2() {
 
           {/* MANDATE */}
           <div className="mt-2">
-            <MandatePanel type="issue" />
+            <CollapsibleChecklist section={2} />
           </div>
         </>
       )}
