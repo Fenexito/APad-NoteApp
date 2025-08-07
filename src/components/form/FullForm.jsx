@@ -57,17 +57,6 @@ export default function FullForm() {
       <Section3 />
       <Section4 />
 
-      {/* Botón vista previa */}
-      <div className="flex justify-end pt-1">
-        <Button
-          className="rounded-md bg-green-600 px-5 py-1.5 text-white shadow-sm disabled:opacity-40"
-          onClick={openPreview}
-          disabled={requiredMissing}
-        >
-          Preview Note
-        </Button>
-      </div>
-
       {/* Modals */}
       <ModalFull  open={showFull}  onClose={() => setShowFull(false)}  text={noteText} />
       <ModalSplit open={showSplit} onClose={() => setShowSplit(false)} parts={parts} />

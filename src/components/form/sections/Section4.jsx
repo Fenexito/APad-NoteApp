@@ -98,6 +98,11 @@ export default function Section4() {
     set("outcome", val);
     set("techCbr",""); set("techDate",""); set("techTime","");
     set("ticketSpecial",""); set("transferDept","");
+    if (val === "No | Tech Booked") {
+      set("techAoc", "Yes | $200. Cx aware and agree");
+    } else {
+      set("techAoc", "");
+    }
   };
 
   /* ───────── JSX ───────── */
