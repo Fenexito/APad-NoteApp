@@ -2,24 +2,24 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
 import Header from "../components/ui/Header";
-import ButtonsShortkeys from "../shortkeys/ButtonsShortkeys";
+import ButtonsShortkeys from "../SHORTKEYS/ButtonsShortkeys";
 
 import {
   loadShortcuts,
   saveShortcuts,
   exportShortcutsJSON,
   importShortcutsJSON,
-  makeEmptyShortcut,
-} from "../shortkeys/store";
-import ShortkeyList from "../shortkeys/ShortkeyList";
-import ShortkeyEditor from "../shortkeys/ShortkeyEditor";
+  makeEmptyShortcut } from
+"../SHORTKEYS/store";
+import ShortkeyList from "../SHORTKEYS/ShortkeyList";
+import ShortkeyEditor from "../SHORTKEYS/ShortkeyEditor";
 import ConfirmModal from "../components/ui/ConfirmModal";
 
 export default function ShortKeys() {
   const navigate = useNavigate();
 
   const [items, setItems] = useState(() => loadShortcuts());
-  const [view, setView] = useState("list");          // "list" | "editor"
+  const [view, setView] = useState("list"); // "list" | "editor"
   const [editing, setEditing] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [selectedKey, setSelectedKey] = useState(null);
@@ -28,10 +28,10 @@ export default function ShortKeys() {
   const [pendingDeleteKey, setPendingDeleteKey] = useState(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
-  useEffect(() => { document.title = "Shortkeys Editor"; }, []);
-  useEffect(() => { saveShortcuts(items); }, [items]);
+  useEffect(() => {document.title = "Shortkeys Editor";}, []);
+  useEffect(() => {saveShortcuts(items);}, [items]);
 
-  const goList = () => { setEditing(null); setView("list"); };
+  const goList = () => {setEditing(null);setView("list");};
 
   /* === LISTA === */
   const handleAdd = () => {
@@ -41,7 +41,7 @@ export default function ShortKeys() {
       tags: [],
       steps: [{ id: "result", type: "template", template: "" }],
       _forceSimple: true,
-      _tempId: Date.now(), // para forzar remount del editor
+      _tempId: Date.now() // para forzar remount del editor
     };
     setEditing(empty);
     setView("editor");
@@ -100,7 +100,7 @@ export default function ShortKeys() {
     delete clean._tempId;
     setItems((prev) => {
       const exists = prev.some((x) => x.key === clean.key);
-      if (exists) return prev.map((x) => (x.key === clean.key ? clean : x));
+      if (exists) return prev.map((x) => x.key === clean.key ? clean : x);
       return [clean, ...prev];
     });
     setDirty(false);
@@ -111,7 +111,7 @@ export default function ShortKeys() {
 
   const inEditor = view === "editor";
   const canEdit = view === "list" && !!selectedKey;
-  const canDuplicate = (view === "list" && !!selectedKey) || (view === "editor" && !!editing);
+  const canDuplicate = view === "list" && !!selectedKey || view === "editor" && !!editing;
   const canDelete = view === "list" && !!selectedKey; // deshabilitado en editor
 
   const canSave = useMemo(() => {
@@ -134,8 +134,8 @@ export default function ShortKeys() {
       if (!found) return alert("Selecciona un shortkey primero.");
       return handleEdit(found);
     }
-    if (dirty) setShowCancelConfirm(true);
-    else goList();
+    if (dirty) setShowCancelConfirm(true);else
+    goList();
   };
   const onDelete = () => {
     if (inEditor) return;
@@ -148,42 +148,42 @@ export default function ShortKeys() {
     <div className="min-h-screen surface pb-24">
       <Header />
 
-      {view === "list" && (
-        <ShortkeyList
-          items={items}
-          selectedKey={selectedKey}
-          onSelect={(k) => setSelectedKey(k)}
-          onSelectKey={(k) => setSelectedKey(k)}
-          onAdd={handleAdd}
-          onEdit={handleEdit}
-          onDuplicate={handleDuplicate}
-          onMove={handleMove}
-          onExport={handleExport}
-          onImport={handleImport}
-          onDelete={(key) => {
-            setPendingDeleteKey(key);
-            setShowDeleteConfirm(true);
-          }}
-        />
-      )}
+      {view === "list" &&
+      <ShortkeyList
+        items={items}
+        selectedKey={selectedKey}
+        onSelect={(k) => setSelectedKey(k)}
+        onSelectKey={(k) => setSelectedKey(k)}
+        onAdd={handleAdd}
+        onEdit={handleEdit}
+        onDuplicate={handleDuplicate}
+        onMove={handleMove}
+        onExport={handleExport}
+        onImport={handleImport}
+        onDelete={(key) => {
+          setPendingDeleteKey(key);
+          setShowDeleteConfirm(true);
+        }} />
 
-      {view === "editor" && (
-        <div id="view-editor" className="pt-3">
+      }
+
+      {view === "editor" &&
+      <div id="view-editor" className="pt-3">
           <ShortkeyEditor
-            key={(editing && editing._tempId) || "new"}  // <- solo _tempId; @key ya no remonta el componente
-            value={editing}
-            onChange={(draft) => {
-              setEditing(draft);
-              setDirty(true);
-            }}
-          />
+          key={editing && editing._tempId || "new"} // <- solo _tempId; @key ya no remonta el componente
+          value={editing}
+          onChange={(draft) => {
+            setEditing(draft);
+            setDirty(true);
+          }} />
+        
         </div>
-      )}
+      }
 
       <ButtonsShortkeys
         onNew={onNew}
-        onDuplicate={onDuplicate}   // en editor actúa como SAVE
-        onEdit={onEdit}             // en editor actúa como CANCEL (modal)
+        onDuplicate={onDuplicate} // en editor actúa como SAVE
+        onEdit={onEdit} // en editor actúa como CANCEL (modal)
         onDelete={onDelete}
         canDuplicate={canDuplicate}
         canEdit={canEdit}
@@ -191,20 +191,20 @@ export default function ShortKeys() {
         inEditor={inEditor}
         onSave={() => handleSave(editing)}
         onCancel={() => {
-          if (dirty) setShowCancelConfirm(true);
-          else goList();
+          if (dirty) setShowCancelConfirm(true);else
+          goList();
         }}
-        canSave={canSave}
-      />
+        canSave={canSave} />
+      
 
       {/* ELIMINAR */}
       <ConfirmModal
         open={showDeleteConfirm}
         title="Eliminar shortkey"
         description={
-          pendingDeleteKey
-            ? `Esta acción no se puede deshacer.\n¿Quieres eliminar @${pendingDeleteKey}?`
-            : "Esta acción no se puede deshacer."
+        pendingDeleteKey ?
+        `Esta acción no se puede deshacer.\n¿Quieres eliminar @${pendingDeleteKey}?` :
+        "Esta acción no se puede deshacer."
         }
         confirmText="Eliminar"
         confirmTone="danger"
@@ -217,8 +217,8 @@ export default function ShortKeys() {
           if (pendingDeleteKey) actuallyDelete(pendingDeleteKey);
           setShowDeleteConfirm(false);
           setPendingDeleteKey(null);
-        }}
-      />
+        }} />
+      
 
       {/* CANCELAR edición/creación */}
       <ConfirmModal
@@ -241,8 +241,8 @@ export default function ShortKeys() {
           setShowCancelConfirm(false);
           setDirty(false);
           goList();
-        }}
-      />
-    </div>
-  );
+        }} />
+      
+    </div>);
+
 }

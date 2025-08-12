@@ -1,0 +1,66 @@
+[
+  {
+    "file": "src/app.jsx",
+    "changes": [
+      [
+        "./pages/Home",
+        "./PAGES/Home"
+      ],
+      [
+        "./pages/History",
+        "./PAGES/History"
+      ],
+      [
+        "./pages/Dashboard",
+        "./PAGES/Dashboard"
+      ],
+      [
+        "./pages/ShortKeys",
+        "./PAGES/ShortKeys"
+      ],
+      [
+        "./shortkeys/ShortkeyRunner",
+        "./SHORTKEYS/ShortkeyRunner"
+      ]
+    ]
+  },
+  {
+    "file": "src/main.jsx",
+    "changes": [
+      [
+        "./styles/tailwind.css",
+        "./STYLES/tailwind.css"
+      ]
+    ]
+  },
+  {
+    "file": "src/pages/History.jsx",
+    "changes": [
+      [
+        "../db/notes",
+        "../DB/notes"
+      ]
+    ]
+  },
+  {
+    "file": "src/pages/ShortKeys.jsx",
+    "changes": [
+      [
+        "../shortkeys/ButtonsShortkeys",
+        "../SHORTKEYS/ButtonsShortkeys"
+      ],
+      [
+        "../shortkeys/store",
+        "../SHORTKEYS/store"
+      ],
+      [
+        "../shortkeys/ShortkeyList",
+        "../SHORTKEYS/ShortkeyList"
+      ],
+      [
+        "../shortkeys/ShortkeyEditor",
+        "../SHORTKEYS/ShortkeyEditor"
+      ]
+    ]
+  }
+]

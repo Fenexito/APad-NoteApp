@@ -3,13 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 import Header from "../components/ui/Header";
 import HistoryBar from "../components/ui/HistoryBar";
 import { lazy, Suspense } from "react";
- const ModalSplit = lazy(() => import("../components/ui/ModalSplit"));
- const ModalFull = lazy(() => import("../components/ui/ModalFull"));
- const ModalEditNote = lazy(() => import("../components/ui/ModalEditNote"));
+const ModalSplit = lazy(() => import("../components/ui/ModalSplit"));
+const ModalFull = lazy(() => import("../components/ui/ModalFull"));
+const ModalEditNote = lazy(() => import("../components/ui/ModalEditNote"));
 import { useToast } from "../components/ui/ToastContext";
 const ConfirmModal = lazy(() => import("../components/ui/ConfirmModal"));
 
-import { getNotes, updateNote, deleteNote } from "../db/notes";
+import { getNotes, updateNote, deleteNote } from "../DB/notes";
 import HistoryList from "../components/history/HistoryList";
 
 import { parseMetaFromText } from "../utils/history";
@@ -77,7 +77,7 @@ export default function History() {
     } catch {
       meta = {};
     }
-    const safe = (v, prev) => (v && v !== v?.toUpperCase() ? v : prev); // evita "LABEL: LABEL"
+    const safe = (v, prev) => v && v !== v?.toUpperCase() ? v : prev; // evita "LABEL: LABEL"
 
     // Construcción base
     let updated = {
@@ -99,8 +99,8 @@ export default function History() {
         techTime: safe(meta.techTime, selectedNote.resolution?.techTime),
         followUpDate: safe(meta.followUpDate, selectedNote.resolution?.followUpDate),
         followUpTime: safe(meta.followUpTime, selectedNote.resolution?.followUpTime),
-        ticketSpecial: safe(meta.specialTicket, selectedNote.resolution?.ticketSpecial),
-      },
+        ticketSpecial: safe(meta.specialTicket, selectedNote.resolution?.ticketSpecial)
+      }
     };
 
     // Normaliza duplicados por outcome
@@ -111,8 +111,8 @@ export default function History() {
         resolution: {
           ...updated.resolution,
           techDate: "",
-          techTime: "",
-        },
+          techTime: ""
+        }
       };
     } else if (outcomeLower.includes("tech")) {
       updated = {
@@ -120,8 +120,8 @@ export default function History() {
         resolution: {
           ...updated.resolution,
           followUpDate: "",
-          followUpTime: "",
-        },
+          followUpTime: ""
+        }
       };
     }
 
@@ -133,7 +133,7 @@ export default function History() {
 
     try {
       await updateNote(updated);
-      setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
+      setNotes((prev) => prev.map((n) => n.id === updated.id ? updated : n));
       setSelectedNote(updated);
       setIsEditing(false);
       setShowEditModal(false); // cierra al guardar
@@ -182,7 +182,7 @@ export default function History() {
     const buildCopilotNote = (text) => {
       const lines = text.split("\n");
       const idx = lines.findIndex((line) =>
-        line.trim().toUpperCase().startsWith("CX ISSUE:")
+      line.trim().toUpperCase().startsWith("CX ISSUE:")
       );
       if (idx !== -1) return lines.slice(idx).join("\n");
       return text;
@@ -228,8 +228,8 @@ export default function History() {
         notes={notes}
         selectedNote={selectedNote}
         setSelectedNote={setSelectedNote}
-        onOpenView={() => setShowViewModal(true)}
-      />
+        onOpenView={() => setShowViewModal(true)} />
+      
 
       {/* Sticky inferior (acciones) */}
       <HistoryBar
@@ -244,31 +244,31 @@ export default function History() {
         onCopilot={handleCopilot}
         onResolution={handleResolution}
         onSave={handleSave}
-        onCancel={handleCancel}
-      />
+        onCancel={handleCancel} />
+      
 
       <Suspense fallback={null}>
         {/* Split modal */}
         <ModalSplit
           open={showSplit}
           onClose={() => setShowSplit(false)}
-          parts={parts}
-        />
+          parts={parts} />
+        
 
         {/* Modal de lectura */}
         <ModalFull
           open={showViewModal}
           onClose={() => setShowViewModal(false)}
-          note={selectedNote?.text || ""}
-        />
+          note={selectedNote?.text || ""} />
+        
 
         {/* Modal de edición */}
         <ModalEditNote
           open={showEditModal}
           onClose={handleCancel}
           note={{ ...selectedNote, text: editedText }}
-          onChangeText={setEditedText}
-        />
+          onChangeText={setEditedText} />
+        
 
         {/* Confirmación de borrado */}
         <ConfirmModal
@@ -278,9 +278,9 @@ export default function History() {
           confirmText="Delete"
           confirmTone="danger"
           onCancel={() => setShowDeleteModal(false)}
-          onConfirm={handleConfirmDelete}
-        />
+          onConfirm={handleConfirmDelete} />
+        
       </Suspense>
-    </div>
-  );
+    </div>);
+
 }
