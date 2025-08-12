@@ -6,7 +6,7 @@ import {
   X, Hash, ChevronUp, ChevronDown, Trash2,
   Plug, Wifi,
 } from "lucide-react";
-import { useFormStore } from "../../../store/useFormStore";
+import useFormStore from "../../../store/useFormStore";
 import FormSection from "../../ui/FormSection";
 import CollapsibleChecklist from "../../ui/CollapsibleChecklist";
 
@@ -40,7 +40,7 @@ const chipCls = (active, c) =>
    ${active ? `${c} text-white border-transparent` : "border-gray-300 dark:bg-gray-800"}`;
 
 /* ───────── Component ───────── */
-export default function Section3() {
+export default function Section3({ open, onToggle }) {
   /* store */
   const {
     data: { alerts, issue },
@@ -59,8 +59,9 @@ export default function Section3() {
   const svc = issue.service ?? "";
   const showAWA = svc === "HighSpeed" || svc.startsWith("Optik");
 
+  const resetCount = useFormStore((s) => s.resetCount);
+
   /* local UI */
-  const [open, setOpen] = useState(true);
   const [openAWA, setOpenAWA] = useState(true);
   const [openSPD, setOpenSPD] = useState(true);
 
@@ -75,6 +76,19 @@ export default function Section3() {
     e.target.style.height = "auto";
     e.target.style.height = e.target.scrollHeight + "px";
   };
+
+  // --- Limpieza numérica ---
+    const cleanInt = (v) => v.replace(/\D/g, "");
+    const cleanDec = (v) => {
+      // Acepta coma o punto, fuerza un solo separador decimal
+      v = (v || "").replace(",", ".").replace(/[^0-9.]/g, "");
+      const firstDot = v.indexOf(".");
+      if (firstDot !== -1) {
+        v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, "");
+      }
+      if (v.startsWith(".")) v = "0" + v; // ".5" -> "0.5"
+      return v;
+    };
 
   const clearDiag = () => {
     clearAlerts();
@@ -97,7 +111,7 @@ export default function Section3() {
       {/* header */}
       <div
         className="mb-1 flex cursor-pointer items-center justify-between"
-        onClick={() => setOpen(!open)}
+        onClick={onToggle}
       >
         <h3 className="flex-1 text-sm font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">
           AWA &amp; Diagnostics
@@ -206,7 +220,7 @@ export default function Section3() {
                   }
                   onInput={autoGrow}
                   rows={3}
-                  className={`form-input resize-none rounded border px-1 py-0.5 text-[11px] dark:bg-gray-800 ${
+                  className={`shortkey-enabled form-input resize-none rounded border px-1 py-0.5 text-[11px] dark:bg-gray-800 ${
                     stepsMissing ? "border-red-500" : "border-gray-300"
                   }`}
                 />
@@ -301,8 +315,9 @@ export default function Section3() {
                               inputMode="decimal"
                               maxLength={6}
                               value={t.down}
+                              pattern="[0-9]*[.,]?[0-9]*"
                               onChange={(e) =>
-                                updateSpeedTest(i, "down", e.target.value)
+                                updateSpeedTest(i, "down", cleanDec(e.target.value))
                               }
                               className="col-span-2 form-input rounded border px-1 py-0.5 text-[11px] text-center dark:bg-gray-800 border-gray-300 no-spinner"
                             />
@@ -311,8 +326,9 @@ export default function Section3() {
                               inputMode="decimal"
                               maxLength={6}
                               value={t.up}
+                              pattern="[0-9]*[.,]?[0-9]*"
                               onChange={(e) =>
-                                updateSpeedTest(i, "up", e.target.value)
+                                updateSpeedTest(i, "up", cleanDec(e.target.value))
                               }
                               className="col-span-2 form-input rounded border px-1 py-0.5 text-[11px] text-center dark:bg-gray-800 border-gray-300 no-spinner"
                             />
@@ -347,11 +363,12 @@ export default function Section3() {
                         <input
                           placeholder="Active"
                           inputMode="numeric"
+                          pattern="[0-9]*"
                           maxLength={3}
                           value={issue.devicesActive}
                           onChange={(e) =>
                             updateSection("issue", {
-                              devicesActive: e.target.value,
+                              devicesActive: cleanInt(e.target.value),
                             })
                           }
                           className="form-input w-full rounded border px-1 py-0.5 text-center text-[11px] dark:bg-gray-800 border-gray-300 no-spinner"
@@ -359,11 +376,12 @@ export default function Section3() {
                         <input
                           placeholder="Total"
                           inputMode="numeric"
+                          pattern="[0-9]*"
                           maxLength={3}
                           value={issue.devicesTotal}
                           onChange={(e) =>
                             updateSection("issue", {
-                              devicesTotal: e.target.value,
+                              devicesTotal: cleanInt(e.target.value),
                             })
                           }
                           className="form-input w-full rounded border px-1 py-0.5 text-center text-[11px] dark:bg-gray-800 border-gray-300 no-spinner"
@@ -378,7 +396,7 @@ export default function Section3() {
 
           {/* ███ Excellence Mandate – Sección 3 ███ */}
           <div className="mt-2">
-            <CollapsibleChecklist section={3} />
+            <CollapsibleChecklist section={3} key={resetCount + "-3"} />
           </div>
         </>
       )}

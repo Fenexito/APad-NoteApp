@@ -1,9 +1,7 @@
-import create from "zustand";
+import { create } from "zustand";
 
-export const useFormStore = create((set) => ({
-  /* ═════════════ STATE ═════════════ */
+const useFormStore = create((set) => ({
   data: {
-    /* 1. Customer */
     customer: {
       ban: "",
       cid: "",
@@ -17,8 +15,6 @@ export const useFormStore = create((set) => ({
       phone: "",
       accountId: "",
     },
-
-    /* 2. Issue Details */
     issue: {
       cxIssue: "",
       serviceOnCsr: "",
@@ -30,7 +26,6 @@ export const useFormStore = create((set) => ({
       affected: "",
       equipSummary: "",
       troubleshooting: "",
-      /* Sección 3 */
       awaSteps: "",
       spTests: [
         { stage: "Before", down: "", up: "", wired: false },
@@ -41,25 +36,17 @@ export const useFormStore = create((set) => ({
       tvsUsed: "",
       tvsKey: "",
     },
-
-    /* 3. AWA alerts (sección 3) */
     alerts: [],
-
-    /* 4. Technical Problem (por si se usa en otra sección) */
     problem: {
       services: [],
       equipment: "",
       connections: [],
       steps: [],
     },
-
-    /* 5. Inspection (por si se usa en otra sección) */
     inspection: {
       featureName: "",
       findings: "",
     },
-
-    /* 6. Resolution */
     resolution: {
       outcome: "",
       techCbr: "",
@@ -71,14 +58,11 @@ export const useFormStore = create((set) => ({
       ticketFinal: "",
       csrOrder: "",
     },
-
-    /* 7. Excellence Mandate checklist */
-    checklist: {}, // { [id:number]: "YES"|"NO"|"NA" }
+    checklist: {},
   },
 
-  /* ═════════════ ACTIONS ═════════════ */
+  resetCount: 0, // ← este contador ayuda a forzar el reseteo visual
 
-  /** Actualiza cualquier sección de primer nivel en `data` */
   updateSection: (section, payload) =>
     set((s) => ({
       data: {
@@ -87,9 +71,6 @@ export const useFormStore = create((set) => ({
       },
     })),
 
-  /* ── Checklist helpers ── */
-
-  /** Toggle manual (anticuado para booleanos) */
   toggleChecklistItem: (key) =>
     set((s) => ({
       data: {
@@ -101,7 +82,6 @@ export const useFormStore = create((set) => ({
       },
     })),
 
-  /** Set explícito para auto-checks */
   setChecklistItem: (key, value) =>
     set((s) => ({
       data: {
@@ -113,7 +93,6 @@ export const useFormStore = create((set) => ({
       },
     })),
 
-  /* ── AWA alerts ── */
   toggleAlert: (key) =>
     set((s) => ({
       data: {
@@ -126,7 +105,6 @@ export const useFormStore = create((set) => ({
   clearAlerts: () =>
     set((s) => ({ data: { ...s.data, alerts: [] } })),
 
-  /* ── Speed-Tests ── */
   addSpeedTest: () =>
     set((s) => ({
       data: {
@@ -156,4 +134,70 @@ export const useFormStore = create((set) => ({
         },
       };
     }),
+
+  reset: () =>
+    set((s) => ({
+      data: {
+        customer: {
+          ban: "",
+          cid: "",
+          name: "",
+          cbr: "",
+          caller: "",
+          verifiedBy: "",
+          securityQuestions: "",
+          address: "",
+          xid: "",
+          phone: "",
+          accountId: "",
+        },
+        issue: {
+          cxIssue: "",
+          serviceOnCsr: "",
+          errorType: "",
+          errorDetails: "",
+          technology: "",
+          service: "",
+          workflow: "",
+          affected: "",
+          equipSummary: "",
+          troubleshooting: "",
+          awaSteps: "",
+          spTests: [
+            { stage: "Before", down: "", up: "", wired: false },
+            { stage: "After", down: "", up: "", wired: false },
+          ],
+          devicesActive: "",
+          devicesTotal: "",
+          tvsUsed: "",
+          tvsKey: "",
+        },
+        alerts: [],
+        problem: {
+          services: [],
+          equipment: "",
+          connections: [],
+          steps: [],
+        },
+        inspection: {
+          featureName: "",
+          findings: "",
+        },
+        resolution: {
+          outcome: "",
+          techCbr: "",
+          techDate: "",
+          techTime: "",
+          techAoc: "",
+          ticketSpecial: "",
+          transferDept: "",
+          ticketFinal: "",
+          csrOrder: "",
+        },
+        checklist: {},
+      },
+      resetCount: s.resetCount + 1, // <-- cada vez que se reinicia, suma 1
+    })),
 }));
+
+export default useFormStore;

@@ -1,7 +1,7 @@
 // src/notebuilder.js
 
 export function buildNote(data) {
-  const { customer, issue, alerts, resolution } = data;
+  const { customer = {}, issue = {}, alerts = [], resolution = {} } = data || {};
   const lines = [];
 
   // — AGENTE —
@@ -19,14 +19,14 @@ export function buildNote(data) {
 
   if (customer.verifiedBy) {
     const mapSQ = (q) => {
-      switch (q.trim()) {
+      switch ((q || "").trim()) {
         case "Primary Phone #":            return "Phone 1";
         case "Secondary Phone #":          return "Phone 2";
         case "Email Address":              return "Email";
-        case "Billing Address & Postal Code":
-          return "Address+PC";
+        case "Address & Postal Code":
+          return "Address";
         default:
-          return q.trim();
+          return (q || "").trim();
       }
     };
     const sqs = (customer.securityQuestions || "")
@@ -51,13 +51,12 @@ export function buildNote(data) {
   if (issue.serviceOnCsr) lines.push(`SERVICE ON CSR: ${issue.serviceOnCsr}`);
 
   // ERROR / OUTAGE / NC  (con el detalle real que ingresó el usuario)
-  if (issue.errorType === "") {
-    // Ningún error activo
+  if (!issue.errorType || issue.errorType === "") {
+    // sin selección: no agregamos línea
+  } else if (issue.errorType === "none") {
     lines.push(`No active Outages / No errors on NC`);
   } else if (issue.errorType === "outage") {
-    // Línea principal
     const base = `ACTIVE OUTAGE AFFECTING SERVICES`;
-    // Si el usuario ingresó texto en errorDetails, lo añadimos tras la coma
     if (issue.errorDetails && issue.errorDetails.trim()) {
       lines.push(`${base}, ${issue.errorDetails.trim()}`);
     } else {
@@ -81,23 +80,36 @@ export function buildNote(data) {
     lines.push(svcLine);
   }
 
-  if (issue.workflow)      lines.push(`WORKFLOW: ${issue.workflow}`);
-  if (issue.equipSummary)  lines.push(`CHECKPHYSICAL: ${issue.equipSummary}`);
-  if (issue.troubleshooting) lines.push(`TS STEPS: ${issue.troubleshooting}`);
+  if (issue.workflow) lines.push(`WORKFLOW: ${issue.workflow}`);
+
+  // --- AFFECTED (derivado de issue.affected + issue.service) ---
+  // En el store solo existe "affected": cuando el servicio es HomePhone/Telus Email/MyTelus es obligatorio.
+  const affectedVal = (issue.affected || "").trim();
+  if (affectedVal) {
+    if (issue.service === "HomePhone") {
+      lines.push(`AFFECTED PHONE: ${affectedVal}`);
+    } else if (issue.service === "Telus Email") {
+      lines.push(`AFFECTED EMAIL: ${affectedVal}`);
+    } else if (issue.service === "MyTelus") {
+      lines.push(`MY TELUS EMAIL: ${affectedVal}`);
+    }
+  }
+
+  if (issue.equipSummary)     lines.push(`CHECKPHYSICAL: ${issue.equipSummary}`);
+  if (issue.troubleshooting)  lines.push(`TS STEPS: ${issue.troubleshooting}`);
 
   // — AWA & DIAGNOSTICS —
-  if (alerts.length)       lines.push(`AWA ALERTS: ${alerts.join(", ")}`);
-  if (issue.awaSteps)      lines.push(`AWA STEPS: ${issue.awaSteps}`);
+  if (alerts.length)          lines.push(`AWA ALERTS: ${alerts.join(", ")}`);
+  if (issue.awaSteps)         lines.push(`AWA STEPS: ${issue.awaSteps}`);
 
   // SPEEDTESTS solo si hay down o up
-  const filledTests = issue.spTests.filter((t) => t.down || t.up);
+  const spTests = Array.isArray(issue.spTests) ? issue.spTests : [];
+  const filledTests = spTests.filter((t) => (t?.down || t?.up));
   if (filledTests.length) {
     const repr = filledTests
       .map(
         (t) =>
-          `${t.down || "-"}Mbps / ${t.up || "-"}Mbps ${
-            t.wired ? "Wired" : "Wireless"
-          }`
+          `${t.down || "-"}Mbps / ${t.up || "-"}Mbps ${t.wired ? "Wired" : "Wireless"}`
       )
       .join(" ; ");
     lines.push(`SPEEDTESTS: ${repr}`);
@@ -105,9 +117,7 @@ export function buildNote(data) {
 
   if (issue.devicesActive || issue.devicesTotal) {
     lines.push(
-      `ACTIVE/TOTAL DEVICES: ${issue.devicesActive || 0} / ${
-        issue.devicesTotal || 0
-      }`
+      `ACTIVE/TOTAL DEVICES: ${issue.devicesActive || 0} / ${issue.devicesTotal || 0}`
     );
   }
 
@@ -120,16 +130,10 @@ export function buildNote(data) {
   // — RESOLUTION —
   if (resolution.outcome) lines.push(`RESOLVED: ${resolution.outcome}`);
 
-  if (
-    resolution.outcome === "No | BOSR Created" &&
-    resolution.ticketSpecial
-  ) {
+  if (resolution.outcome === "No | BOSR Created" && resolution.ticketSpecial) {
     lines.push(`BOSR TICKET: ${resolution.ticketSpecial}`);
   }
-  if (
-    resolution.outcome === "No | NC Ticket Created" &&
-    resolution.ticketSpecial
-  ) {
+  if (resolution.outcome === "No | NC Ticket Created" && resolution.ticketSpecial) {
     lines.push(`NC TICKET: ${resolution.ticketSpecial}`);
   }
 
@@ -142,17 +146,20 @@ export function buildNote(data) {
     lines.push(`CBR2: ${resolution.techCbr}`);
   }
 
-  if (resolution.techDate && resolution.techTime) {
-    lines.push(`DISPATCH: ${resolution.techDate} - ${resolution.techTime}`);
-  }
-  if (
-    ["No | Follow Up Required", "No | Follow Up Required | Set SCB with FVA"].includes(
-      resolution.outcome
-    ) &&
-    resolution.techDate &&
-    resolution.techTime
-  ) {
-    lines.push(`FOLLOW UP: ${resolution.techDate} - ${resolution.techTime}`);
+  // Agenda (DISPATCH vs FOLLOW UP) — usar SIEMPRE techDate/techTime y etiquetar según outcome
+  const hasDateTime = Boolean(resolution.techDate && resolution.techTime);
+  if (hasDateTime) {
+    const isFollowUp =
+      resolution.outcome === "No | Follow Up Required" ||
+      resolution.outcome === "No | Follow Up Required | Set SCB with FVA";
+    const isTech = resolution.outcome === "No | Tech Booked";
+
+    if (isFollowUp) {
+      lines.push(`FOLLOW UP: ${resolution.techDate} - ${resolution.techTime}`);
+    } else if (isTech) {
+      lines.push(`DISPATCH: ${resolution.techDate} - ${resolution.techTime}`);
+    }
+    // Si el outcome no coincide con ninguno, no agregamos línea para evitar duplicados/ambigüedad.
   }
 
   if (resolution.transferDept) {
@@ -160,8 +167,7 @@ export function buildNote(data) {
   }
 
   if (
-    resolution.outcome ===
-      "Cx ask for a Manager | Unable to de escalate | Escalate to EMT" &&
+    resolution.outcome === "Cx ask for a Manager | Unable to de escalate | Escalate to EMT" &&
     resolution.ticketSpecial
   ) {
     lines.push(`EMT TICKET: ${resolution.ticketSpecial}`);

@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import ModalFull from "./ModalFull";
 import { buildNote } from "../../utils/noteBuilder";
-import { useFormStore } from "../../store/useFormStore";
+import useFormStore from "../../store/useFormStore";
 
 export default function NoteModalController() {
   const data = useFormStore((s) => s.data);

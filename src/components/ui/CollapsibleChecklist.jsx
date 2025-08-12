@@ -1,7 +1,6 @@
-/* src/components/ui/CollapsibleChecklist.jsx */
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Check } from "lucide-react";
-import { useFormStore } from "../../store/useFormStore";
+import useFormStore from "../../store/useFormStore";
 import { MANDATES, evaluateMandates } from "../../mandate/mandateRules";
 
 /* Colores pastel suaves + texto oscuro */
@@ -9,6 +8,8 @@ const COLORS = {
   YES: "bg-green-200 text-gray-900",
   NO:  "bg-red-200 text-gray-900",
   NA:  "bg-yellow-100 text-gray-900",
+  "":  "bg-gray-50 text-gray-900",
+  undefined: "bg-gray-50 text-gray-900"
 };
 
 /* Resalta TODAS las palabras en MAYÚSCULAS */
@@ -20,7 +21,7 @@ const highlight = (txt) => {
     out.push(
       <span key={idx} className="font-bold text-blue-700">
         {caps}
-      </span>,
+      </span>
     );
     last = idx + caps.length;
   });
@@ -29,19 +30,19 @@ const highlight = (txt) => {
 };
 
 export default function CollapsibleChecklist({ section }) {
-  /* ---------- store ---------- */
+  // ---------- store ----------
   const data      = useFormStore((s) => s.data);
   const checklist = useFormStore((s) => s.data.checklist);
   const setItem   = useFormStore((s) => s.setChecklistItem);
 
   const items = MANDATES.filter((m) => m.section === section);
 
-  /* ---------- UI local ---------- */
-  const [open, setOpen] = useState(true);     // siempre arranca abierto
-  const autoCollapsed = useRef(false);        // evita varios cierres
-  const touched       = useRef(new Set());    // IDs tocados manualmente
-  const [, force]     = useState(0);          // trigger rerender
+  // ---------- UI local ----------
+  const [open, setOpen] = useState(true); // SIEMPRE inicia abierto
+  const touched = useRef(new Set());      // IDs tocados manualmente
+  const [, force] = useState(0);          // trigger rerender
 
+  // Marca ítem como tocado si fue clic manual
   const markTouched = (id) => {
     if (!touched.current.has(id)) {
       touched.current.add(id);
@@ -49,44 +50,63 @@ export default function CollapsibleChecklist({ section }) {
     }
   };
 
-  /* Valor inicial “NO” para cada ítem */
+  // Inicializa como vacío si nunca ha sido contestado
   useEffect(() => {
     items.forEach(({ id }) => {
-      if (!checklist[id]) setItem(id, "NO");
+      if (checklist[id] === undefined) setItem(id, "");
     });
   }, [items, checklist, setItem]);
 
-  /* Autochequeo (reglas) – NO marca “touched” */
+  // Aplica reglas automáticas, pero SOLO pone YES en el checklist (no afecta touched)
   useEffect(() => {
-  const auto = evaluateMandates(data);        // { id:"YES" | "NO" | "NA" }
+    const auto = evaluateMandates(data);
+    Object.entries(auto).forEach(([idStr, autoVal]) => {
+      const id = +idStr;
+      if (autoVal === "YES" && checklist[id] !== "YES") {
+        setItem(id, "YES");
+      }
+    });
+  }, [data, checklist, setItem]);
 
-  Object.entries(auto).forEach(([idStr, autoVal]) => {
-    const id = +idStr;
-    if (autoVal === "YES" && checklist[id] !== "YES") {
-      setItem(id, "YES");                     // ← ÚNICA escritura automática
-    }
-  });
-}, [data, checklist, setItem]);
-
-  /* Colapsa UNA sola vez cuando el usuario haya “tocado” todos */
+  // COMPLETADO = el usuario hizo click manual en todos los mandates (aunque los autos estén en YES, solo cuenta si fue tocado)
   const allTouched = touched.current.size === items.length;
   useEffect(() => {
-    if (!autoCollapsed.current && allTouched) {
+    if (allTouched && open) {
       setOpen(false);
-      autoCollapsed.current = true;
     }
+    // eslint-disable-next-line
   }, [allTouched]);
 
-  /* ---------- render ---------- */
+  // Handler simple: usuario puede abrir/cerrar cuando quiera
+  const handleToggle = () => setOpen((o) => !o);
+
+  // ¿Falta alguno sin contestar?
+  const mandatesMissing = items.some(({ id }) =>
+    !["YES", "NO", "NA"].includes(checklist[id])
+  );
+
+  // Clases para el fondo y texto del colapsable completo (verde o rojo, texto blanco)
+  const containerBg = allTouched
+    ? "bg-green-700 text-white"
+    : mandatesMissing
+    ? "bg-red-500 text-white"
+    : "bg-white dark:bg-gray-800 text-gray-900";
+
   return (
-    <div className="rounded-lg bg-white shadow dark:bg-gray-800">
+    <div className={`rounded-lg shadow transition-colors duration-200 ${containerBg}`}>
       {/* header */}
       <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center px-2 py-1 text-left text-[11px] font-semibold uppercase"
+        onClick={handleToggle}
+        className={`
+          flex w-full items-center px-2 py-1 text-left text-[11px] font-semibold uppercase
+          transition-colors duration-200
+          ${allTouched ? "text-white" : mandatesMissing ? "text-white" : "text-gray-900"}
+        `}
       >
         <span className="flex-1">Excellence Mandate</span>
-        {allTouched && <Check size={14} className="mr-1 text-green-600" />}
+        {!open && allTouched && (
+          <Check size={14} className="mr-1 text-white" />
+        )}
         {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
 
@@ -98,23 +118,20 @@ export default function CollapsibleChecklist({ section }) {
       >
         <ul className="space-y-1 px-2 pb-2 pt-1">
           {items.map(({ id, text }) => {
-            const val = checklist[id] || "NO";
+            const val = checklist[id] ?? "";
             return (
               <li key={id}>
                 <div
                   className={`flex items-center justify-between rounded-md px-2 py-1 text-[11px] ${COLORS[val]}`}
                 >
                   <p className="flex-1">{highlight(text)}</p>
-
                   {/* botones alineados */}
                   <div className="flex shrink-0">
                     {["YES", "NO", "NA"].map((opt) => (
                       <button
                         key={opt}
                         onClick={() => {
-                          /* 1️⃣  registra que el usuario tocó este mandato */
                           markTouched(id);
-                          /* 2️⃣  guarda el valor elegido */
                           setItem(id, opt);
                         }}
                         className={`mx-[1px] w-8 rounded border px-1.5 py-0.5 font-bold ${

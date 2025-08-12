@@ -2,3 +2,92 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ==== Anti-jumps por barra de scroll (global) ==== */
+html {
+  /* El root es scroller y siempre reserva gutter */
+  overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
+}
+
+/* Altura 100% para asegurar scroll en root cuando aplique */
+html, body, #root { height: 100%; }
+
+/* Fallback para navegadores sin scrollbar-gutter */
+@supports not (scrollbar-gutter: stable) {
+  html { overflow-y: scroll; } /* fuerza gutter reservado siempre */
+}
+
+/* Si alguna página usa un contenedor propio como scroller (p. ej. .surface / main),
+   reserva gutter también ahí para que no “salte” al entrar/salir de esa ruta. */
+:where(main, .surface, .scroll-root) {
+  scrollbar-gutter: stable both-edges;
+}
+
+/* ==== Patch global de modo oscuro y superficies reutilizables ==== */
+@layer base {
+  html { @apply bg-white text-gray-900; }
+  html.dark { @apply bg-gray-950 text-gray-100; }
+  body { @apply bg-transparent; }
+
+  /* Normaliza inputs nativos y tu clase .form-input */
+  input, select, textarea, .form-input {
+    @apply bg-white text-gray-900 border-gray-300;
+  }
+  html.dark input, html.dark select, html.dark textarea, html.dark .form-input {
+    @apply bg-gray-800 text-gray-100 border-gray-600;
+  }
+
+  /* Placeholders */
+  input::placeholder, textarea::placeholder { @apply text-gray-400; }
+  html.dark input::placeholder, html.dark textarea::placeholder { @apply text-gray-500; }
+
+  /* Scrollbars (opcionales; funcionan en navegadores basados en WebKit/Chromium) */
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-thumb { background-color: rgb(209 213 219); border-radius: 9999px; }
+  html.dark *::-webkit-scrollbar-thumb { background-color: rgb(75 85 99); }
+  *::-webkit-scrollbar-track { background-color: transparent; }
+}
+
+@layer components {
+  /* Superficies para reutilizar en headers/bars/cards/modales */
+  .surface { @apply bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100; }
+  .card-surface { @apply bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded; }
+  .border-base { @apply border-gray-300 dark:border-gray-600; }
+
+  /* Sticky bars: fondo semitransparente + blur para que no “parpadeen” en dark */
+  .sticky-surface {
+    @apply bg-white/90 dark:bg-gray-900/90 backdrop-blur;
+  }
+  /* fallback si el navegador no soporta backdrop-filter */
+  @supports not ((-webkit-backdrop-filter: blur(0)) or (backdrop-filter: blur(0))) {
+    .sticky-surface { @apply bg-white dark:bg-gray-900; }
+  }
+
+  /* Modales */
+  .modal-overlay { @apply fixed inset-0 bg-black/40 dark:bg-black/60; }
+  .modal-panel   { @apply card-surface; }
+
+  /* Botones por defecto (puedes adaptarlos a tu sistema) */
+  .btn {
+    @apply inline-flex items-center justify-center gap-1
+           rounded-md border border-base px-3 py-1.5 text-sm
+           bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700
+           transition-colors;
+  }
+  .btn-primary {
+    @apply border-transparent bg-blue-600 text-white hover:bg-blue-700
+           disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+  .btn-danger {
+    @apply border-transparent bg-red-600 text-white hover:bg-red-700
+           disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+
+  @layer components {
+  /* Sube tamaño a TODOS los inputs/selects/textareas dentro de .form-root */
+  .form-root :is(input, textarea, select) {
+    @apply text-[13px] leading-5;
+  }
+}
+}

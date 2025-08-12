@@ -5,13 +5,14 @@ import { useState } from "react";
 import {
   ChevronUp, ChevronDown, Trash2, ToggleLeft, ToggleRight,
 } from "lucide-react";
-import { useFormStore } from "../../../store/useFormStore";
+import useFormStore from "../../../store/useFormStore";
 import FormSection from "../../ui/FormSection";
 import CollapsibleChecklist from "../../ui/CollapsibleChecklist";
 
 /* ───────── Listas ───────── */
 const RESOLVED_OPTS = [
   "YES | EOC",
+  "No | Contacting CORE SUPPORT",
   "No | Call Disconnected | Left VM",
   "No | Tech Booked",
   "No | Follow Up Required",
@@ -43,16 +44,16 @@ const TRANSFER_OPTS = [
 ];
 
 const TIME_SLOTS = [
-  "08:00 – 10:00","10:00 – 12:00","12:00 – 14:00",
-  "14:00 – 16:00","16:00 – 18:00","18:00 – 20:00","20:00 – 22:00",
+  "08:00-9:00","9:00-11:00","11:00-1:00", "1:00-3:00","3:00-5:00","5:00-7:00","8:00-5:00",
 ];
 
 /* ───────── Componente ───────── */
-export default function Section4() {
+export default function Section4({ open, onToggle }) {
   const res = useFormStore((s) => s.data.resolution);
   const up  = useFormStore((s) => s.updateSection);
 
-  const [open, setOpen]           = useState(true);
+  const resetCount = useFormStore((s) => s.resetCount);
+
   const [transferOnToggle, setT]  = useState(false);
 
   const set = (k, v) => up("resolution", { [k]: v });
@@ -89,10 +90,13 @@ export default function Section4() {
   const missFinal     = !res.ticketFinal;
 
   const padTicket = () => {
-    const d = res.ticketFinal.replace(/\D/g,"");
+    const d = (res.ticketFinal || "").replace(/\D/g,"");
     if (!d) return;
     set("ticketFinal", d.padStart(15,"0").slice(-15));
   };
+
+  // Solo dígitos
+  const cleanInt = (v) => (v ?? "").replace(/\D/g, "");
 
   const handleOutcome = (val) => {
     set("outcome", val);
@@ -111,7 +115,7 @@ export default function Section4() {
       {/* header */}
       <div
         className="mb-1 flex cursor-pointer items-center justify-between"
-        onClick={() => setOpen(!open)}
+        onClick={onToggle}
       >
         <h3 className="flex-1 text-sm font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">
           RESOLUTION
@@ -186,8 +190,9 @@ export default function Section4() {
             <label className="flex flex-col gap-0.5 text-[10px] font-semibold uppercase">
               <span>CSR ORDER</span>
               <input
+                inputMode="numeric" pattern="[0-9]*"
                 value={res.csrOrder}
-                onChange={(e)=>set("csrOrder", e.target.value)}
+                onChange={(e)=>set("csrOrder", cleanInt(e.target.value))}
                 className="form-input rounded border px-1 py-0.5 text-[11px] dark:bg-gray-800 border-gray-300"
               />
             </label>
@@ -199,6 +204,7 @@ export default function Section4() {
               {isTech && (
                 <label className="flex flex-col text-[10px] font-semibold uppercase">
                   <span>CBR2 {missTech&&!res.techCbr && <span className="text-red-600">*</span>}</span>
+                  {/* CBR2 SIN RESTRICCIÓN: permite "N/A" u otros textos */}
                   <input
                     value={res.techCbr}
                     onChange={(e)=>set("techCbr", e.target.value)}
@@ -274,8 +280,13 @@ export default function Section4() {
               <label className="flex flex-col gap-0.5 text-[10px] font-semibold uppercase">
                 <span>{ticketLbl} {missTicket && <span className="text-red-600">*</span>}</span>
                 <input
+                  inputMode={["BOSR TICKET","NC TICKET"].includes(ticketLbl) ? "numeric" : undefined}
+                  pattern={["BOSR TICKET","NC TICKET"].includes(ticketLbl) ? "[0-9]*" : undefined}
                   value={res.ticketSpecial}
-                  onChange={(e)=>set("ticketSpecial", e.target.value)}
+                  onChange={(e)=>set(
+                    "ticketSpecial",
+                    ["BOSR TICKET","NC TICKET"].includes(ticketLbl) ? (e.target.value || "").replace(/\D/g,"") : e.target.value
+                  )}
                   className={`form-input rounded border px-1 py-0.5 text-[11px] dark:bg-gray-800 ${
                     missTicket ? "border-red-500":"border-gray-300"
                   }`}
@@ -286,7 +297,7 @@ export default function Section4() {
 
           {/* Excellence Mandate (Sección 4) */}
           <div className="mt-2">
-            <CollapsibleChecklist section={4} />
+            <CollapsibleChecklist section={4} key={resetCount + "-4"} />
           </div>
         </>
       )}
