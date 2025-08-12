@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2025-08-12T17:56:19.549Z",
+  "generatedAt": "2025-08-12T18:18:35.687Z",
   "dryRun": false,
   "moves": [
     {
@@ -20,96 +20,6 @@
     {
       "from": "src/pages/ShortKeys.jsx",
       "to": "src/PAGES/ShortKeys.jsx",
-      "type": "file"
-    },
-    {
-      "from": "src/components/form/Buttons.jsx",
-      "to": "src/FORM/Buttons.jsx",
-      "type": "file"
-    },
-    {
-      "from": "src/components/form/EquipmentPanel.jsx",
-      "to": "src/FORM/EquipmentPanel.jsx",
-      "type": "file"
-    },
-    {
-      "from": "src/components/form/FullForm.jsx",
-      "to": "src/FORM/FullForm.jsx",
-      "type": "file"
-    },
-    {
-      "from": "src/components/form/sections/Section1.jsx",
-      "to": "src/FORM/SECTIONS/Section1.jsx",
-      "type": "file"
-    },
-    {
-      "from": "src/components/form/sections/Section2.jsx",
-      "to": "src/FORM/SECTIONS/Section2.jsx",
-      "type": "file"
-    },
-    {
-      "from": "src/components/form/sections/Section3.jsx",
-      "to": "src/FORM/SECTIONS/Section3.jsx",
-      "type": "file"
-    },
-    {
-      "from": "src/components/form/sections/Section4.jsx",
-      "to": "src/FORM/SECTIONS/Section4.jsx",
-      "type": "file"
-    },
-    {
-      "from": "src/mandate/mandateRules.js",
-      "to": "src/FORM/mandate/mandateRules.js",
-      "type": "file"
-    },
-    {
-      "from": "src/components/history/HistoryList.jsx",
-      "to": "src/HISTORY/HistoryList.jsx",
-      "type": "file"
-    },
-    {
-      "from": "src/components/ui/Button.jsx",
-      "to": "src/UI/Button.jsx",
-      "type": "file"
-    },
-    {
-      "from": "src/components/ui/CollapsibleChecklist.jsx",
-      "to": "src/UI/CollapsibleChecklist.jsx",
-      "type": "file"
-    },
-    {
-      "from": "src/components/ui/FormSection.jsx",
-      "to": "src/UI/FormSection.jsx",
-      "type": "file"
-    },
-    {
-      "from": "src/components/ui/Header.jsx",
-      "to": "src/UI/Header.jsx",
-      "type": "file"
-    },
-    {
-      "from": "src/hooks/useDisplayName.js",
-      "to": "src/UI/hooks/useDisplayName.js",
-      "type": "file"
-    },
-    {
-      "from": "src/components/ui/ConfirmModal.jsx",
-      "to": "src/MODALES/ConfirmModal.jsx",
-      "type": "file"
-    },
-    {
-      "from": "src/db/notes.js",
-      "to": "src/DB/notes.js",
-      "type": "file"
-    },
-    {
-      "from": "src/store/useFormStore.js",
-      "to": "src/STORE/useFormStore.js",
-      "type": "file"
-    },
-    {
-      "from": "src/styles/tailwind.css",
-      "to": "src/STYLES/tailwind.css",
       "type": "file"
     },
     {
@@ -145,6 +55,16 @@
     {
       "from": "src/shortkeys/store.js",
       "to": "src/SHORTKEYS/store.js",
+      "type": "file"
+    },
+    {
+      "from": "src/db/notes.js",
+      "to": "src/DB/notes.js",
+      "type": "file"
+    },
+    {
+      "from": "src/styles/tailwind.css",
+      "to": "src/STYLES/tailwind.css",
       "type": "file"
     }
   ],
