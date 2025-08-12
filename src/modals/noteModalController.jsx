@@ -1,7 +1,7 @@
 // src/components/ui/NoteModalController.jsx
 import { useState, useEffect } from "react";
 import ModalFull from "./ModalFull";
-import { buildNote } from "../../utils/noteBuilder";
+import { buildNote } from "../ui/utils/noteBuilder";
 import useFormStore from "../../store/useFormStore";
 
 export default function NoteModalController() {

@@ -1,7 +1,7 @@
 // src/pages/History.jsx
 import { useEffect, useMemo, useState } from "react";
-import Header from "../components/ui/Header";
-import HistoryBar from "../components/ui/HistoryBar";
+import Header from "../ui/Header";
+import HistoryBar from "../history/HistoryBar";
 import { lazy, Suspense } from "react";
 const ModalSplit = lazy(() => import("../components/ui/ModalSplit"));
 const ModalFull = lazy(() => import("../components/ui/ModalFull"));

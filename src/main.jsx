@@ -2,8 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, HashRouter } from 'react-router-dom';
 import App from "./app";
-import "./STYLES/tailwind.css";
-import { ToastProvider } from "./components/ui/ToastContext"; // usa la ruta correcta
+import "./styles/tailwind.css";
+import { ToastProvider } from "./ui/ToastContext"; // usa la ruta correcta
 
 const isFile = location.protocol === 'file:';
 const Router = isFile ? HashRouter : BrowserRouter;

@@ -4,13 +4,13 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import Home from "./PAGES/Home";
 import History from "./PAGES/History";
 import Dashboard from "./PAGES/Dashboard";
-import ThemeToggle from "./components/ui/ThemeToggle";
+import ThemeToggle from "./ui/ThemeToggle";
 import ShortKeys from "./PAGES/ShortKeys";
 import { useEffect } from "react";
 import { initShortkeyRunner } from "./SHORTKEYS/ShortkeyRunner";
 
 // Importa el controlador unificado de nota final
-import NoteModalController from "./components/ui/noteModalController";
+import NoteModalController from "./modals/noteModalController";
 
 export default function App() {
   useEffect(() => {
