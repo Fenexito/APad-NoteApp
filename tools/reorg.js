@@ -1,10 +1,3 @@
-// tools/reorg.js
-// Reorganiza APAD sin modificar contenido de archivos.
-// Uso:
-//   node tools/reorg.js --dry   (muestra qué haría)
-//   node tools/reorg.js --run   (ejecuta los movimientos)
-// Recomendación: hacer commit/backup antes.
-
 const fs = require("fs");
 const fsp = fs.promises;
 const path = require("path");
