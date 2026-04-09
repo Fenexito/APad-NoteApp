@@ -1,29 +1,51 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { X, ClipboardCopy } from "lucide-react";
-import { useToast } from "../ui/ToastContext"; // Ajusta ruta si es necesario
-import NoteCharCounter from "./NoteCharCounter";
+import { useToast } from "../ui/ToastContext";
+import NoteCharCounter from "../ui/NoteCharCounter";
+import { splitNoteFinal } from "../ui/utils/splitnote";
 
-export default function ModalSplit({ open, onClose, parts = [] }) {
+/* ============================ MODAL SPLIT ============================ */
+
+export default function ModalSplit({
+  open,
+  onClose,
+  text = "",
+  parts = [], // compat: si en el Form ya me mandan las partes, las puedo mostrar tal cual
+}) {
   const toast = useToast();
+  const containerRef = useRef(null);
 
+  // Cerrar con ESC (hook siempre registrado; el handler respeta `open`)
   useEffect(() => {
     if (!open) return;
     const handleEsc = (e) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onClose?.();
     };
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
   }, [open, onClose]);
 
+  // ⚠️ No hagas early-return aquí; primero define todos los hooks para no romper el orden.
+
+  // Prioridad:
+  // 1) Si viene `text`, SIEMPRE calculo con el mismo algoritmo del Form (splitNoteFinal).
+  // 2) Si no hay `text`, pero recibí `parts` no vacío, muestro esas partes (modo compat con el Form actual).
+  const computedParts = useMemo(() => {
+    const src = (text ?? "").trim();
+    if (src) return splitNoteFinal(src);
+    if (Array.isArray(parts) && parts.length > 0) return parts.filter(Boolean);
+    return [];
+  }, [text, parts]);
+
+  // Ahora sí: si está cerrado, no renderizo
   if (!open) return null;
 
-  // Tamaño compacto para mostrar hasta 3 partes
-  const maxParts = Math.max(2, parts.length);
-  const height = maxParts === 2 ? "h-[28vh]" : "h-[18vh]";
+  // Altura por cantidad de partes
+  const h = computedParts.length <= 2 ? "h-[28vh]" : "h-[18vh]";
 
   return (
     <>
-      {/* Fondo oscuro */}
+      {/* Fondo */}
       <div
         className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
         onClick={onClose}
@@ -31,14 +53,20 @@ export default function ModalSplit({ open, onClose, parts = [] }) {
 
       {/* Modal */}
       <div
+        ref={containerRef}
         className="
           fixed top-1/2 left-1/2 z-50
           w-full max-w-lg
-          -translate-x-1/2 -translate-y-1/2
+          -translate-x-1/2 -translate-y-[55%]
           bg-white dark:bg-gray-800
           rounded-2xl shadow-2xl
           overflow-hidden
         "
+        data-history-modal
+        role="dialog"
+        aria-modal="true"
+        // Evita que el listener global del historial cierre al hacer click adentro
+        onPointerDownCapture={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2 bg-gray-100 dark:bg-gray-900">
@@ -55,18 +83,24 @@ export default function ModalSplit({ open, onClose, parts = [] }) {
           </button>
         </div>
 
-        {/* Parts */}
+        {/* Contenido */}
         <div className="p-4 flex flex-col gap-5">
-          {parts.map((p, i) => (
+          {!computedParts.length && (
+            <div className="text-sm text-slate-600 dark:text-slate-300">
+              No hay contenido para dividir. Asegúrate de pasar <code>text</code> o <code>parts</code>.
+            </div>
+          )}
+
+          {computedParts.map((p, i) => (
             <div
               key={i}
               className={`
                 relative flex flex-col rounded-lg bg-gray-100 dark:bg-gray-900
-                p-3 ${height} min-h-[80px] overflow-hidden
+                p-3 ${h} min-h-[80px] overflow-hidden
                 border border-gray-200 dark:border-gray-700
               `}
             >
-              {/* Título + contador por parte */}
+              {/* Título + contador */}
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-bold text-blue-700 dark:text-blue-300">
                   {`PARTE ${i + 1}`}
@@ -74,17 +108,24 @@ export default function ModalSplit({ open, onClose, parts = [] }) {
                 <NoteCharCounter noteText={String(p || "")} />
               </div>
 
-              {/* Contenido */}
+              {/* Texto */}
               <pre className="whitespace-pre-wrap text-sm flex-1 overflow-y-auto text-gray-700 dark:text-gray-200 pr-2">
                 {p}
               </pre>
 
-              {/* Acciones (copiar) */}
+              {/* Copiar */}
               <div className="mt-2 flex justify-end">
                 <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(p || "");
-                    toast && toast(`Part ${i + 1} COPIED`, "success");
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(p || "");
+                      if (toast?.success) toast.success(`Part ${i + 1} copied`);
+                      else if (typeof toast === "function") toast(`Part ${i + 1} copied`, "success");
+                    } catch (err) {
+                      console.error(err);
+                      if (toast?.error) toast.error("Copy failed");
+                      else if (typeof toast === "function") toast("Copy failed", "error");
+                    }
                   }}
                   className="inline-flex items-center gap-1.5 rounded-2xl border px-3 py-1.5 text-xs font-semibold shadow-md transition
                              text-blue-700 border-blue-200 bg-white/70 hover:bg-blue-50

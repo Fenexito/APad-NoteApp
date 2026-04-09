@@ -1,5 +1,30 @@
 // src/notebuilder.js
 
+// === AWA ALERTS: key -> label (exactamente como en el selector) ===
+const AWA_LABELS = {
+  na: "N/A",
+  noErrors: "No Errors / Alerts Found on AWA",
+  noAwa: "AWA not available / nonexistent",
+  notManaged: "Unable to get AWA. Modem not managed by HDM",
+  ontUnranged: "Unable to get AWA. ONT Not ranged",
+  thirdPartyGw: "Unable to get AWA. Cx using third party Gateway",
+  noSync: "Unable to get AWA. No sync on Modem",
+  bbDownCong: "Broadband DOWNSTREAM congestion (>80% plan speed)",
+  bbUpCong: "Broadband UPSTREAM congestion (>80% plan speed)",
+  avgWifiSlow: "Average Wi-Fi speed slower than Broadband (many devices)",
+  slowOne: "Occasional Slowspeed in ONE device",
+  slowSome: "Occasional Slowspeed in some devices",
+  discOne: "Occasional Disconnections in ONE device",
+  discSome: "Occasional Disconnections in some devices",
+  legacyMode: "Devices operating in legacy Wi-Fi Mode",
+  interferenceAutoCh: "Interference problems detected. Set Gateway to WiFi auto channel and rescan",
+  gatewayReboot: "Multiple gateway/modem reboots",
+  pwdProblems: "Password problems",
+  lowMemory: "Low-memory issues detected in the router",
+  manyDevices: "High number of devices connected detected",
+  pppDown: "Gateway disconnecting from provider network (PPP down)",
+};
+
 export function buildNote(data) {
   const { customer = {}, issue = {}, alerts = [], resolution = {} } = data || {};
   const lines = [];
@@ -71,14 +96,23 @@ export function buildNote(data) {
     }
   }
 
-  // SERVICE & CONNECTION en la misma línea
+  // SERVICE & CONNECTION en la misma línea (sin mostrar "CONNECTION:")
   if (issue.service) {
-    let svcLine = `SERVICE: ${issue.service}`;
-    if (issue.technology) {
-      svcLine += `, CONNECTION: ${issue.technology}`;
-    }
-    lines.push(svcLine);
+  let svcLine = `SERVICE: ${issue.service}`;
+
+  // agregar tecnología (Fiber / Copper)
+  if (issue.technology) {
+    const tech = issue.technology.charAt(0).toUpperCase() + issue.technology.slice(1).toLowerCase();
+    svcLine += `, ${tech}`;
   }
+
+  // agregar internet plan directo en la misma línea
+  if (issue.internetPlan) {
+    svcLine += ` | ${issue.internetPlan}`;
+  }
+
+  lines.push(svcLine);
+}
 
   if (issue.workflow) lines.push(`WORKFLOW: ${issue.workflow}`);
 
@@ -99,7 +133,10 @@ export function buildNote(data) {
   if (issue.troubleshooting)  lines.push(`TS STEPS: ${issue.troubleshooting}`);
 
   // — AWA & DIAGNOSTICS —
-  if (alerts.length)          lines.push(`AWA ALERTS: ${alerts.join(", ")}`);
+  if (alerts.length) {
+    const readable = alerts.map((k) => AWA_LABELS[k] || String(k));
+    lines.push(`AWA ALERTS: ${readable.join(", ")}`);
+  }
   if (issue.awaSteps)         lines.push(`AWA STEPS: ${issue.awaSteps}`);
 
   // SPEEDTESTS solo si hay down o up
@@ -109,15 +146,15 @@ export function buildNote(data) {
     const repr = filledTests
       .map(
         (t) =>
-          `${t.down || "-"}Mbps / ${t.up || "-"}Mbps ${t.wired ? "Wired" : "Wireless"}`
+          `${t.down || "-"}Mbps/${t.up || "-"}Mbps ${t.wired ? "Wired" : "Wireless"}`
       )
-      .join(" ; ");
+      .join("; ");
     lines.push(`SPEEDTESTS: ${repr}`);
   }
 
   if (issue.devicesActive || issue.devicesTotal) {
     lines.push(
-      `ACTIVE/TOTAL DEVICES: ${issue.devicesActive || 0} / ${issue.devicesTotal || 0}`
+      `ACTIVE/TOTAL DEVICES: ${issue.devicesActive || 0}/${issue.devicesTotal || 0}`
     );
   }
 
@@ -137,9 +174,9 @@ export function buildNote(data) {
     lines.push(`NC TICKET: ${resolution.ticketSpecial}`);
   }
 
-  // ** AOC SIEMPRE aparece si está poblado **
-  if (resolution.techAoc) {
-    lines.push(`AOC: ${resolution.techAoc}`);
+  // ** AOPC SIEMPRE aparece si está poblado **
+  if (resolution.techAopc) {
+    lines.push(`AOPC: ${resolution.techAopc}`);
   }
 
   if (resolution.techCbr) {
@@ -151,7 +188,7 @@ export function buildNote(data) {
   if (hasDateTime) {
     const isFollowUp =
       resolution.outcome === "No | Follow Up Required" ||
-      resolution.outcome === "No | Follow Up Required | Set SCB with FVA";
+      resolution.outcome === "No | Follow Up Required | Set SCB with Scheduler";
     const isTech = resolution.outcome === "No | Tech Booked";
 
     if (isFollowUp) {

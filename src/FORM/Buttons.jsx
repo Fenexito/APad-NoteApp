@@ -1,18 +1,39 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardCopy, ScissorsSquare, FileSearch, UserCog, Save, RefreshCw } from "lucide-react";
 import Button from "../ui/Button";
-import { addNote } from "../../db/notes";
+import { addNote } from "../db/notes";
 
 // --- COPILOT NOTE UTILITY ---
+// Copia desde "CX ISSUE:" y elimina AFFECTED PHONE / AFFECTED EMAIL / MY TELUS EMAIL
 function buildCopilotNote(text) {
-  const lines = text.split("\n");
-  const idx = lines.findIndex(line =>
+  const all = String(text || "").split("\n");
+  const idx = all.findIndex((line) =>
     line.trim().toUpperCase().startsWith("CX ISSUE:")
   );
-  if (idx !== -1) {
-    return lines.slice(idx).join("\n");
-  }
-  return text;
+  const slice = idx !== -1 ? all.slice(idx) : all;
+
+  // Patrones a excluir
+  const lineRemoveRe = /^\s*(?:CBR2|AFFECTED\s+PHONE(?:\s+NUMBER)?|AFFECTED\s+EMAIL|MY\s+TELUS\s+EMAIL)\s*:/i;
+  const inlineStripRes = [
+    /\bCBR2\s*:\s*.*$/i,
+    /\bAFFECTED\s+PHONE(?:\s+NUMBER)?\s*:\s*.*$/i,
+    /\bAFFECTED\s+EMAIL\s*:\s*.*$/i,
+    /\bMY\s+TELUS\s+EMAIL\s*:\s*.*$/i,
+  ];
+
+  const cleanedLines = slice
+    // 1) Eliminar líneas que empiezan con cualquiera de esos campos
+    .filter((l) => !lineRemoveRe.test(l))
+    // 2) Si aparecen embebidos en otras líneas, cortar desde el campo al final
+    .map((l) => {
+      let out = l;
+      for (const re of inlineStripRes) out = out.replace(re, "");
+      return out.replace(/\s+$/, "");
+    });
+
+  // Quita saltos excesivos (3+ líneas vacías → 2)
+  const joined = cleanedLines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  return joined;
 }
 
 // --- Mandate Validation Helper ---
@@ -21,7 +42,7 @@ function allMandatesCompleted(checklist) {
     ? Object.keys(checklist)
     : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
   return ids.every(
-    id =>
+    (id) =>
       checklist?.[id] === "YES" ||
       checklist?.[id] === "NO" ||
       checklist?.[id] === "NA"
@@ -75,10 +96,11 @@ export default function Buttons({
   setShowReset,
   isFormComplete, toast,
   handleReset,
-  baselineKey,       // <- clave que cambia cuando el padre re-baselinea
-  pristineVersion,   // <- contador para re-baseline explícito (montaje / reset)
+  baselineKey, // <- clave que cambia cuando el padre re-baselinea
+  pristineVersion, // <- contador para re-baseline explícito (montaje / reset)
   // ⬇️ agregado para reset silencioso (sin toast de "FORM RESETED")
   reset,
+  resetAfterSave, // ⬅️ NUEVO: reset que también expande secciones
 }) {
   // ---------- SNAPSHOT CONTROLADO POR baselineKey ----------
   const initialRef = useRef(null);
@@ -92,11 +114,11 @@ export default function Buttons({
     if (snapshotTimerRef.current) clearTimeout(snapshotTimerRef.current);
     snapshotTimerRef.current = setTimeout(() => {
       initialRef.current = {
-        noteText: (noteText || ""),
+        noteText: noteText || "",
         data: safeClone(data),
         parts: safeClone(parts),
         checklist: safeClone(checklist),
-        copilotUsed: !!copilotUsed,
+        copilotUsed: !!copilotUsed
       };
       setBaselineReady(true);
     }, 0);
@@ -110,7 +132,7 @@ export default function Buttons({
   const isDirtyAgainstSnapshot = useMemo(() => {
     const init = initialRef.current;
     if (!init) return false;
-    if (!deepEqual((noteText || ""), init.noteText)) return true;
+    if (!deepEqual(noteText || "", init.noteText)) return true;
     if (!deepEqual(parts, init.parts)) return true;
     if (!deepEqual(data, init.data)) return true;
     if (!deepEqual(checklist, init.checklist)) return true;
@@ -119,12 +141,16 @@ export default function Buttons({
   }, [noteText, parts, data, checklist, copilotUsed]);
 
   // ---------- HABILITACIÓN (ya no visibilidad) ----------
-  const canSave = isFormComplete && allMandatesCompleted(checklist);
-  const canCopilot = canSave;
+  const canSave = isFormComplete;
+  const canCopilot = true;
   const hasCxIssue = /^CX ISSUE:.*(?:\n(?![A-Z ]+:).*)*/m.test(noteText || "");
   const hasTsSteps = /^TS STEPS:.*(?:\n(?![A-Z ]+:).*)*/m.test(noteText || "");
   const canResolution = hasCxIssue && hasTsSteps;
-  const canReset = (baselineKey != null) && baselineReady && isDirtyAgainstSnapshot;
+  const canReset = baselineKey != null && baselineReady && isDirtyAgainstSnapshot;
+
+  // Perfil de validación (para lógica de COPILOT requerido)
+  const validationProfile = data?.ui?.validationProfile || "strict";
+  const isExpress = validationProfile === "express";
 
   // ---------- HANDLERS ----------
   const handleSplitCopy = (txt, idx, total) => {
@@ -142,12 +168,6 @@ export default function Buttons({
     await navigator.clipboard.writeText(buildCopilotNote(noteText));
     toast("COPILOT copied to clipboard", "success");
     setCopilotUsed(true);
-    setTimeout(() => {
-      toast("Opening FUELIX in a new tab", "error");
-      setTimeout(() => {
-        window.open("https://app.fuelix.ai/en/copilots/copilot-490597fe4c554160b59b/chats/new", "_blank");
-      }, 900);
-    }, 1000);
   };
 
   const handleResolutionClick = () => {
@@ -178,12 +198,12 @@ export default function Buttons({
     navigator.clipboard.writeText(toCopy);
   };
 
-  // ⬇️ SAVE: exige COPILOT usado; guarda; toast de éxito; reset silencioso
+  // ⬇️ SAVE: en STRICT exige COPILOT; en EXPRESS **no** lo exige
   const handleSaveClick = async () => {
     if (!canSave) return;
 
-    // 1) Confirmar que ya se usó COPILOT
-    if (!copilotUsed) {
+    // 1) Confirmar COPILOT solo en modo STRICT
+    if (!isExpress && !copilotUsed) {
       toast?.("Primero usa COPILOT para generar la nota.", "warning");
       return;
     }
@@ -203,18 +223,23 @@ export default function Buttons({
         bosrTicket: data?.resolution?.bosrTicket,
         ncTicket: data?.resolution?.ncTicket,
         emtTicket: data?.resolution?.emtTicket,
-        resolution: data?.resolution,
+        resolution: data?.resolution
       });
 
       // 3) Mostrar SOLO el toast de guardado OK
       toast?.("Note SAVED successfully", "success");
 
-      // 4) Reset silencioso para evitar el toast de "FORM RESETED"
-      if (typeof reset === "function") {
+      // 4) Cerrar modales de nota completa / dividida si están abiertos
+     if (typeof setShowFull === "function") setShowFull(false);
+     if (typeof setShowSplit === "function") setShowSplit(false);
+
+      // 5) Reset + expandir secciones (silencioso)
+      if (typeof resetAfterSave === "function") {
+        resetAfterSave();
+      } else if (typeof reset === "function") {
         reset();
       } else {
-        // Fallback (si el padre no provee reset()): hará reset con su propio toast
-        console.warn("[Buttons] reset() no provisto, usando handleReset() (generará toast).");
+        console.warn("[Buttons] resetAfterSave()/reset() no provistos, usando handleReset() (con toast).");
         handleReset?.();
       }
     } catch (e) {
@@ -269,15 +294,17 @@ export default function Buttons({
           <span>COPY</span>
         </Button>
 
-        {/* COPILOT (si no aplica, queda deshabilitado) */}
+        {/* COPILOT (siempre habilitado) */}
         <Button
           onClick={handleCopilotClick}
           disabled={!canCopilot}
           className={`!px-4 !py-2 text-xs flex flex-col items-center gap-0.5 font-semibold
                       w-[70px] border shadow-md transition
-                      ${canCopilot
-                        ? "text-fuchsia-700 border-fuchsia-200 bg-white/70 hover:bg-fuchsia-50 dark:text-fuchsia-300 dark:border-fuchsia-800/40 dark:bg-gray-800/70 dark:hover:bg-fuchsia-900/30"
-                        : "text-gray-400 border-gray-200 bg-white/50 cursor-not-allowed dark:text-gray-500 dark:border-gray-700 dark:bg-gray-800/50"}`}
+                      ${
+                        canCopilot
+                          ? "text-fuchsia-700 border-fuchsia-200 bg-white/70 hover:bg-fuchsia-50 dark:text-fuchsia-300 dark:border-fuchsia-800/40 dark:bg-gray-800/70 dark:hover:bg-fuchsia-900/30"
+                          : "text-gray-400 border-gray-200 bg-white/50 cursor-not-allowed dark:text-gray-500 dark:border-gray-700 dark:bg-gray-800/50"
+                      }`}
         >
           <UserCog size={18} />
           <span>COPILOT</span>
@@ -289,9 +316,11 @@ export default function Buttons({
           disabled={!canResolution}
           className={`!px-4 !py-2 text-xs flex flex-col items-center gap-0.5 font-semibold
                       w-[80px] border shadow-md transition
-                      ${canResolution
-                        ? "text-cyan-700 border-cyan-200 bg-white/70 hover:bg-cyan-50 dark:text-cyan-300 dark:border-cyan-800/40 dark:bg-gray-800/70 dark:hover:bg-cyan-900/30"
-                        : "text-gray-400 border-gray-200 bg-white/50 cursor-not-allowed dark:text-gray-500 dark:border-gray-700 dark:bg-gray-800/50"}`}
+                      ${
+                        canResolution
+                          ? "text-cyan-700 border-cyan-200 bg-white/70 hover:bg-cyan-50 dark:text-cyan-300 dark:border-cyan-800/40 dark:bg-gray-800/70 dark:hover:bg-cyan-900/30"
+                          : "text-gray-400 border-gray-200 bg-white/50 cursor-not-allowed dark:text-gray-500 dark:border-gray-700 dark:bg-gray-800/50"
+                      }`}
         >
           <ClipboardCopy size={18} />
           <span>RESOLUTION</span>
@@ -303,9 +332,11 @@ export default function Buttons({
           disabled={!canSave}
           className={`!px-4 !py-2 text-xs flex flex-col items-center gap-0.5 font-semibold
                       w-[70px] border shadow-md transition
-                      ${canSave
-                        ? "text-green-700 border-green-200 bg-white/70 hover:bg-green-50 dark:text-green-300 dark:border-green-800/40 dark:bg-gray-800/70 dark:hover:bg-green-900/30"
-                        : "text-gray-400 border-gray-200 bg-white/50 cursor-not-allowed dark:text-gray-500 dark:border-gray-700 dark:bg-gray-800/50"}`}
+                      ${
+                        canSave
+                          ? "text-green-700 border-green-200 bg-white/70 hover:bg-green-50 dark:text-green-300 dark:border-green-800/40 dark:bg-gray-800/70 dark:hover:bg-green-900/30"
+                          : "text-gray-400 border-gray-200 bg-white/50 cursor-not-allowed dark:text-gray-500 dark:border-gray-700 dark:bg-gray-800/50"
+                      }`}
         >
           <Save size={18} />
           <span>SAVE</span>
@@ -317,9 +348,11 @@ export default function Buttons({
           disabled={!canReset}
           className={`!px-4 !py-2 text-xs flex flex-col items-center gap-0.5 font-semibold
                       w-[70px] border shadow-md transition
-                      ${canReset
-                        ? "text-red-700 border-red-200 bg-white/70 hover:bg-red-50 dark:text-red-300 dark:border-red-800/40 dark:bg-gray-800/70 dark:hover:bg-red-900/30"
-                        : "text-gray-400 border-gray-200 bg-white/50 cursor-not-allowed dark:text-gray-500 dark:border-gray-700 dark:bg-gray-800/50"}`}
+                      ${
+                        canReset
+                          ? "text-red-700 border-red-200 bg-white/70 hover:bg-red-50 dark:text-red-300 dark:border-red-800/40 dark:bg-gray-800/70 dark:hover:bg-red-900/30"
+                          : "text-gray-400 border-gray-200 bg-white/50 cursor-not-allowed dark:text-gray-500 dark:border-gray-700 dark:bg-gray-800/50"
+                      }`}
         >
           <RefreshCw size={18} />
           <span>RESET</span>

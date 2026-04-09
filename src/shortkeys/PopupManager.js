@@ -9,7 +9,7 @@ function ensureContainers() {
   }
 
   const basePopupClasses = [
-    // Contenedor visual (solo Tailwind)
+    // Contenedor visual (Tailwind original)
     "fixed", "z-[2000]", "bg-white", "border", "border-gray-300",
     "rounded-md", "shadow-xl", "text-xs", "text-slate-800",
     "max-h-48", "overflow-y-auto", "min-w-[240px]", "max-w-[380px]",
@@ -32,7 +32,7 @@ function ensureContainers() {
 }
 
 function optionButtonHTML({ type, item, index }) {
-  // Botón base (grid: @key + descripción/preview)
+  // Botón base (grid: @key + descripción/preview) — MISMO layout/estilo
   const baseBtn =
     "w-full grid grid-cols-[auto_1fr] gap-2 items-center px-2.5 py-1.5 text-left cursor-pointer " +
     "hover:bg-gray-100 focus:outline-none";
@@ -43,7 +43,10 @@ function optionButtonHTML({ type, item, index }) {
         <span class="search-key font-mono font-semibold text-blue-700 bg-blue-100 border border-blue-200 rounded px-1">
           @${item.key}
         </span>
-        <span class="search-desc text-gray-600 truncate">${item.preview || item.description || ""}</span>
+        <!-- Antes: truncate. Ahora: multilínea, mismo color/tamaño; ancho ya está limitado por el popup -->
+        <span class="search-desc text-gray-600 whitespace-normal break-words" style="text-align:justify;">
+          ${item.preview || item.description || ""}
+        </span>
       </button>
     `;
   }
@@ -53,13 +56,16 @@ function optionButtonHTML({ type, item, index }) {
       <span class="interaction-label font-mono font-semibold text-blue-700 bg-blue-100 border border-blue-200 rounded px-1">
         ${item.label ?? ""}
       </span>
-      <span class="interaction-value text-gray-600 truncate">${item.value ?? ""}</span>
+      <!-- Antes: truncate. Ahora: multilínea + justificado, conservando estilo -->
+      <span class="interaction-value text-gray-600 whitespace-normal break-words" style="text-align:justify;">
+        ${item.value ?? ""}
+      </span>
     </button>
   `;
 }
 
 export default class PopupManager {
-  // Agrego onCancel opcional
+  // Agrego onCancel opcional (igual que original que enviaste)
   constructor(element, onSelect, onCancel = null) {
     this.element = element;
     this.onSelect = onSelect;
@@ -91,7 +97,7 @@ export default class PopupManager {
     );
     if (!this.popup) return;
 
-    // Contenido (Tailwind puro)
+    // Contenido (Tailwind original)
     const promptHTML = prompt
       ? `<div class="px-3 py-2 border-b border-gray-200 text-gray-700 font-semibold text-xs">${prompt}</div>`
       : "";
@@ -102,13 +108,13 @@ export default class PopupManager {
 
     this.popup.innerHTML = promptHTML + optsHTML;
 
-    // Por si acaso (overflow-x oculto)
+    // Por si acaso (mantener sin scroll horizontal)
     this.popup.style.overflowX = "hidden";
 
     // Posicionar y mostrar (flotante con fixed)
     this._positionAtCaretOrElement();
 
-    // Mostrar con transición (clases Tailwind)
+    // Mostrar con transición (mismas clases)
     this.popup.classList.remove("opacity-0", "invisible", "scale-95", "-translate-y-2");
     this.popup.classList.add("opacity-100", "visible", "scale-100", "translate-y-0");
 
@@ -118,6 +124,9 @@ export default class PopupManager {
 
     // Selección inicial
     this._updateSelection();
+
+    // === (1) Altura dinámica: mostrar TODO si cabe; si no, limitar a viewport ===
+    this._applyDynamicHeight();
   }
 
   destroy(reason = "normal") {
@@ -129,6 +138,7 @@ export default class PopupManager {
     setTimeout(() => {
       if (this.popup) {
         this.popup.innerHTML = "";
+        // No quitamos clases ni estilos base
         this.popup = null;
       }
       this._detachListeners();
@@ -164,28 +174,30 @@ export default class PopupManager {
   _handleKeydown(e) {
     if (!this.popup) return;
 
+    // === (2) Navegación infinita con flechas (wrap-around) ===
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      this.selectedIndex = Math.min(this.items.length - 1, this.selectedIndex + 1);
-      this._updateSelection();
+      const n = this.items.length;
+      if (n > 0) this.selectedIndex = (this.selectedIndex + 1 + n) % n;
+      this._updateSelection(true);
       return;
     }
 
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      this.selectedIndex = Math.max(0, this.selectedIndex - 1);
-      this._updateSelection();
+      const n = this.items.length;
+      if (n > 0) this.selectedIndex = (this.selectedIndex - 1 + n) % n;
+      this._updateSelection(true);
       return;
     }
 
-    // Enter / Tab / Espacio confirman la opción (consumidor decide cerrar o seguir)
+    // Enter / Tab / Espacio confirman la opción
     if (e.key === "Enter" || e.key === "Tab" || e.key === " " || e.code === "Space" || e.keyCode === 32) {
       e.preventDefault();
       const item = this.items[this.selectedIndex];
       if (item) {
         const cb = this.onSelect;
-        // Suprime el click fantasma que dispara el navegador tras Enter/Espacio
-        this._suppressClicksUntil = Date.now() + 200;
+        this._suppressClicksUntil = Date.now() + 200; // suprime click fantasma
         cb && cb(item);
       }
       return;
@@ -284,6 +296,7 @@ export default class PopupManager {
 
     this.popup.style.left = `${left}px`;
     this.popup.style.top = `${top}px`;
+    // Limitar a viewport horizontal, manteniendo tu max-w-[380px]
     this.popup.style.maxWidth = "calc(100vw - 16px)";
   }
 
@@ -291,10 +304,9 @@ export default class PopupManager {
     const rect = el.getBoundingClientRect();
     const style = window.getComputedStyle(el);
 
-    // --- Creamos un espejo del textarea/input para calcular el rect del caret ---
+    // --- Espejo del textarea/input para calcular rect del caret ---
     const mirror = document.createElement("div");
 
-    // Copiamos estilos relevantes para que el layout sea idéntico
     const props = [
       "fontSize","fontFamily","fontWeight","fontStyle","lineHeight","letterSpacing",
       "textTransform","textAlign","direction","tabSize",
@@ -328,7 +340,7 @@ export default class PopupManager {
     const before = (el.value || "").slice(0, el.selectionStart || 0);
     mirror.textContent = before;
 
-    // Marcador de caret: un span con zero-width space
+    // Marcador de caret
     const marker = document.createElement("span");
     marker.textContent = "\u200b";
     mirror.appendChild(marker);
@@ -338,7 +350,6 @@ export default class PopupManager {
     const mrect = marker.getBoundingClientRect();
     document.body.removeChild(mirror);
 
-    // Coordenadas base (debajo del caret, alineado a su izquierda)
     const left = Math.min(window.innerWidth - 12, Math.max(8, mrect.left));
     const top = Math.min(window.innerHeight - 12, Math.max(8, mrect.bottom + 6));
 
@@ -357,7 +368,7 @@ export default class PopupManager {
     this._positionAtCaretOrElement();
   }
 
-  _updateSelection() {
+  _updateSelection(scrollIntoView = false) {
     if (!this.popup) return;
     const opts = Array.from(this.popup.querySelectorAll(".popup-option"));
     opts.forEach((opt, idx) => {
@@ -375,12 +386,53 @@ export default class PopupManager {
 
       const desc = opt.querySelector(".search-desc, .interaction-value");
       if (desc) {
+        // Conservamos colores; ahora es multilínea (sin truncate)
         desc.classList.toggle("text-gray-600", !isSel);
         desc.classList.toggle("text-white", isSel);
-        desc.classList.add("truncate");
+        // Asegura que no queden restos de 'truncate' por reusos
+        desc.classList.remove("truncate");
       }
 
-      if (isSel) opt.scrollIntoView({ block: "nearest" });
+      if (isSel && scrollIntoView) {
+        opt.scrollIntoView({ block: "nearest" });
+      }
     });
+  }
+
+  // === (1) Lógica de altura dinámica: sin scroll si cabe; si no cabe, limita a viewport ===
+  _applyDynamicHeight() {
+    if (!this.popup) return;
+
+    // Overwrite por ENCIMA de Tailwind max-h-48/overflow-y-auto solo cuando se necesita
+    // Primero medimos con altura libre
+    const prevMaxH = this.popup.style.maxHeight;
+    const prevOverflowY = this.popup.style.overflowY;
+
+    this.popup.style.maxHeight = "none";
+    this.popup.style.overflowY = "visible";
+
+    // Forzamos reflow para obtener altura real
+    const rect = this.popup.getBoundingClientRect();
+    const fullHeight = rect.height;
+
+    const margin = 8;
+    const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+    const maxAllow = vh - margin * 2;
+
+    if (fullHeight > maxAllow) {
+      // Si no cabe, activamos scroll interno y limitamos a viewport
+      this.popup.style.maxHeight = `${maxAllow}px`;
+      this.popup.style.overflowY = "auto";
+    } else {
+      // Si cabe completo, lo mostramos completo sin scroll
+      this.popup.style.maxHeight = "none";
+      this.popup.style.overflowY = "visible";
+    }
+
+    // Reposicionamos por si el cambio de altura afecta la colocación
+    this._reposition();
+
+    // Nota: no restauramos prevMaxH/prevOverflowY; mantener estos overrides
+    // nos da el comportamiento deseado mientras el popup está visible.
   }
 }

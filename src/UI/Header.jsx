@@ -6,10 +6,10 @@ import {
   Keyboard,
   Home as HomeIcon,
   History as HistoryIcon,
-  LayoutDashboard,
-} from "lucide-react";
+  LayoutDashboard } from
+"lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import useDisplayName from "../../hooks/useDisplayName";
+import useDisplayName from "./hooks/useDisplayName";
 import ThemeToggle from "./ThemeToggle";
 
 export default function Header() {
@@ -82,13 +82,13 @@ export default function Header() {
   };
 
   const baseBtn =
-    "inline-flex items-center justify-center rounded-md p-1.5 border border-transparent " +
-    "hover:bg-blue-100/40 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 " +
-    "transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70";
+  "inline-flex items-center justify-center rounded-md p-1.5 border border-transparent " +
+  "hover:bg-blue-100/40 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 " +
+  "transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70";
 
   const baseBtnDisabled =
-    "inline-flex items-center justify-center rounded-md p-1.5 border border-transparent " +
-    "text-blue-400 dark:text-blue-600 opacity-50 cursor-not-allowed";
+  "inline-flex items-center justify-center rounded-md p-1.5 border border-transparent " +
+  "text-blue-400 dark:text-blue-600 opacity-50 cursor-not-allowed";
 
   return (
     <header
@@ -101,8 +101,8 @@ export default function Header() {
         border-b border-base
         px-3 py-2 mb-5
         transition-all duration-300
-      `}
-    >
+      `}>
+      
       <div className="flex items-center justify-between">
         {/* LADO IZQUIERDO: Título + Versión */}
         <div className="flex flex-col gap-0.5">
@@ -115,13 +115,12 @@ export default function Header() {
                          bg-blue-200/60 dark:bg-blue-900/40
                          text-blue-900 dark:text-blue-100
                          text-[11px] font-semibold shadow-sm
-                         border border-blue-300/30 dark:border-blue-800/40 select-none"
-            >
-              v1.1.0
+                         border border-blue-300/30 dark:border-blue-800/40 select-none">       
+              v2.4.1
             </span>
           </div>
           <span className="text-xs text-blue-900/60 dark:text-blue-200/60 font-medium tracking-wide select-none">
-            React Preview
+            Alex Van Houtven
           </span>
         </div>
 
@@ -134,8 +133,8 @@ export default function Header() {
               onClick={() => navigate(contextTarget)}
               className={baseBtn}
               aria-label={contextTitle}
-              title={contextTitle}
-            >
+              title={contextTitle}>
+              
               <ContextIcon size={16} />
             </button>
 
@@ -144,8 +143,8 @@ export default function Header() {
               onClick={() => navigate(shortTarget)}
               className={baseBtn}
               aria-label={shortTitle}
-              title={shortTitle}
-            >
+              title={shortTitle}>
+              
               <ShortIcon size={16} />
             </button>
 
@@ -161,54 +160,64 @@ export default function Header() {
             <span className="text-sm font-semibold text-blue-700 dark:text-blue-300 select-none">PFTS</span>
             <span className="text-sm text-blue-400 dark:text-blue-500 select-none px-1">|</span>
 
-            {editing ? (
-              <div className="flex items-center gap-1 animate-fade-in">
+            {editing ?
+            <div className="flex items-center gap-1 animate-fade-in">
                 <input
-                  value={temp}
-                  onChange={(e) => setTemp(e.target.value)}
-                  onKeyDown={(e) => (e.key === "Enter" ? submit() : null)}
-                  className="w-32 border-b border-blue-300 dark:border-blue-700 bg-transparent
+                value={temp}
+                onChange={(e) => setTemp(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" ? submit() : null}
+                className="w-32 border-b border-blue-300 dark:border-blue-700 bg-transparent
                              px-1 py-0.5 text-blue-900 dark:text-blue-100
                              font-semibold placeholder:text-blue-300 dark:placeholder:text-blue-500
                              focus:outline-none focus:border-blue-400 dark:focus:border-blue-500
                              transition-all duration-150"
-                  placeholder="Tu nombre…"
-                  autoFocus
-                  autoComplete="off"
-                />
+
+
+
+
+                placeholder="Tu nombre…"
+                autoFocus
+                autoComplete="off" />
+              
                 <button
-                  onClick={submit}
-                  className="p-1 rounded hover:bg-blue-100/40 dark:hover:bg-blue-900/40 transition"
-                  aria-label="Guardar nombre"
-                  title="Guardar"
-                >
+                onClick={submit}
+                className="p-1 rounded hover:bg-blue-100/40 dark:hover:bg-blue-900/40 transition"
+                aria-label="Guardar nombre"
+                title="Guardar">
+                
                   <Check size={13} className="text-green-500 dark:text-green-400" />
                 </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setEditing(true)}
-                className="text-sm font-semibold text-blue-900 dark:text-blue-100 truncate
+              </div> :
+
+            <button
+              onClick={() => setEditing(true)}
+              className="text-sm font-semibold text-blue-900 dark:text-blue-100 truncate
                            focus:outline-none group hover:text-blue-700 dark:hover:text-blue-300
                            transition flex items-center"
-                aria-label="Editar nombre"
-                title="Editar nombre de agente"
-                style={{ minWidth: 80 }}
-              >
+
+
+              aria-label="Editar nombre"
+              title="Editar nombre de agente"
+              style={{ minWidth: 80 }}>
+              
                 {name || "Agente"}
                 <PencilLine
-                  size={12}
-                  className="inline ml-1 align-text-bottom
+                size={12}
+                className="inline ml-1 align-text-bottom
                              text-blue-400 dark:text-blue-500
                              opacity-60 group-hover:opacity-100
                              group-hover:text-blue-600 dark:group-hover:text-blue-300
-                             transition"
-                />
+                             transition" />
+
+
+
+
+              
               </button>
-            )}
+            }
           </div>
         </div>
       </div>
-    </header>
-  );
+    </header>);
+
 }

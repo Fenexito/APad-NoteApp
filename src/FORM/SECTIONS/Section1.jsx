@@ -1,26 +1,39 @@
-import { useMemo } from "react";
-import {
-  Clipboard,
-  ChevronUp,
-  ChevronDown,
-  Trash2,
-} from "lucide-react";
-import useFormStore from "../../../store/useFormStore";
+// src/components/form/sections/Section1.jsx
+import { useMemo, useEffect, useRef, useState } from "react";
+import { Clipboard, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import useFormStore from "../../db/useFormStore";
 import MultiCheckboxPopover from "../../ui/MultiCheckboxPopover";
 import FormSection from "../../ui/FormSection";
 import CollapsibleChecklist from "../../ui/CollapsibleChecklist";
 
-export default function Section1({ open, onToggle }) {
+export default function Section1({
+  open,
+  onToggle,
+  // Indicador de estado (se pinta en el header)
+  statusComplete,
+  statusIndicatorTitle,
+  statusIndicatorClasses,
+  // Borde friendly cuando la sección está cerrada
+  closedBorderClass,
+  // Control del Mandate (Excellence)
+  mandateCompleted = false,
+  mandateDefaultOpen = true,
+  mandateResetSignal = 0,
+}) {
   const data = useFormStore((s) => s.data.customer);
   const update = useFormStore((s) => s.updateSection);
-
   const resetCount = useFormStore((s) => s.resetCount);
+
+  // === perfil de validación global (ui.validationProfile) ===
+  const profile = useFormStore((s) => s.data.ui?.validationProfile || "strict");
+  const setProfile = (p) => update("ui", { validationProfile: p });
 
   const copy = (txt) => navigator.clipboard.writeText(txt);
 
-  // Lógica condicional y requeridos
+  // Lógica condicional y requeridos (S1 SIEMPRE estricta)
   const showXid = data.caller === "Consultation";
   const showSecQ = ["Security Questions", "Manual Auth"].includes(data.verifiedBy);
+
   // Normaliza el string guardado: separa por coma, recorta espacios y elimina vacíos
   const secQArr = useMemo(
     () =>
@@ -44,18 +57,59 @@ export default function Section1({ open, onToggle }) {
     [data, showSecQ, secQArr]
   );
 
+  // ✅ Auto-colapso con 1s de espera y 300ms de animación (scaleY + fade)
+  const allRequiredComplete = useMemo(
+    () => Object.values(requiredMissing).every((v) => !v),
+    [requiredMissing]
+  );
+  const collapseTimerRef = useRef(null); // espera (1s)
+  const animTimerRef = useRef(null);     // animación (300ms)
+  const [autoClosing, setAutoClosing] = useState(false);
+  const [autoCollapseDisabled, setAutoCollapseDisabled] = useState(false);
+  const ANIM_MS = 300;
+
+  // Re-habilitar auto-colapso cuando pase de incompleta→completa tras edición
+  const prevCompleteRef = useRef(allRequiredComplete);
+  useEffect(() => {
+    const wasComplete = prevCompleteRef.current;
+    if (!wasComplete && allRequiredComplete) {
+      setAutoCollapseDisabled(false);
+    }
+    prevCompleteRef.current = allRequiredComplete;
+  }, [allRequiredComplete]);
+
+  useEffect(() => {
+    if (collapseTimerRef.current) { clearTimeout(collapseTimerRef.current); collapseTimerRef.current = null; }
+    if (animTimerRef.current) { clearTimeout(animTimerRef.current); animTimerRef.current = null; }
+    if (open && allRequiredComplete && !autoCollapseDisabled) {
+      collapseTimerRef.current = setTimeout(() => {
+        setAutoClosing(true);
+        animTimerRef.current = setTimeout(() => {
+          if (open) onToggle();
+          setAutoClosing(false);
+        }, ANIM_MS);
+      }, 1000);
+    } else {
+      setAutoClosing(false);
+    }
+    return () => {
+      if (collapseTimerRef.current) { clearTimeout(collapseTimerRef.current); collapseTimerRef.current = null; }
+      if (animTimerRef.current) { clearTimeout(animTimerRef.current); animTimerRef.current = null; }
+    };
+  }, [open, allRequiredComplete, autoCollapseDisabled, onToggle]);
+
   // Handlers
   const handleChange = (e) => {
-      const tgt = e?.target ?? e ?? {};
-      const { value = "", dataset = {}, name = "" } = tgt;
-      const key = (dataset && dataset.key) || name; // prioriza data-key si existe
-      const numericKeys = ["ban", "cid", "cbr"];
-      const nextValue = numericKeys.includes(key)
-        ? String(value).replace(/\D/g, "") // solo dígitos
-        : value;
-      if (!key) return; // guard: evita romper si llega sin clave
-      update("customer", { [key]: nextValue });
-    };
+    const tgt = e?.target ?? e ?? {};
+    const { value = "", dataset = {}, name = "" } = tgt;
+    const key = (dataset && dataset.key) || name;
+    const numericKeys = ["ban", "cid", "cbr"];
+    const nextValue = numericKeys.includes(key)
+      ? String(value).replace(/\D/g, "")
+      : value;
+    if (!key) return;
+    update("customer", { [key]: nextValue });
+  };
 
   const clearCustomer = () =>
     update("customer", {
@@ -80,11 +134,7 @@ export default function Section1({ open, onToggle }) {
         </span>
 
         {/* Para NAME / ADDRESS envolvemos en un form con autoComplete off (display: contents) */}
-        <form
-          autoComplete="off"
-          onSubmit={(e) => e.preventDefault()}
-          className="contents"
-        >
+        <form autoComplete="off" onSubmit={(e) => e.preventDefault()} className="contents">
           {/* Señuelo password para cortar heurísticas de autofill */}
           {isNoAuto && (
             <input
@@ -97,14 +147,13 @@ export default function Section1({ open, onToggle }) {
           )}
 
           <input
-            name={isNoAuto ? `noauto-${key}` : key}   /* evita gatillar autofill por nombre */
-            data-key={key}                             /* clave real para el estado */
+            name={isNoAuto ? `noauto-${key}` : key}
+            data-key={key}
             value={data[key]}
             onChange={handleChange}
             className={`rounded border px-1 py-0.5 text-[11px] dark:bg-gray-800 ${
-              requiredMissing[key] ? "border-red-500" : "border-gray-300"
+              requiredMissing[key] ? "border-red-500 dark:border-red-500" : "border-gray-300"
             }`}
-            /* BLOQUEO AGRESIVO DE AUTOFILL */
             autoComplete={isNoAuto ? "new-password" : "off"}
             autoCorrect="off"
             autoCapitalize="none"
@@ -140,19 +189,49 @@ export default function Section1({ open, onToggle }) {
 
   // --- RENDER ---
   return (
-    <FormSection>
+    <FormSection className={`${!open ? closedBorderClass : ""} relative z-40 overflow-visible`}>
       {/* Encabezado colapsable */}
       <div
         className="mb-1 flex cursor-pointer items-center justify-between"
-        onClick={onToggle}
+        onClick={() => {
+          if (!open) setAutoCollapseDisabled(true);
+          if (collapseTimerRef.current) { clearTimeout(collapseTimerRef.current); collapseTimerRef.current = null; }
+          if (animTimerRef.current) { clearTimeout(animTimerRef.current); animTimerRef.current = null; }
+          setAutoClosing(false);
+          onToggle();
+        }}
       >
         <h3 className="flex-1 text-sm font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">
           ACCOUNT INFO & VERIFICATION
         </h3>
-        <div
-          className="flex items-center gap-2"
-          onClick={(e) => e.stopPropagation()}
-        >
+
+        {/* === CHIP STRICT / EXPRESS (centrado, entre título y acciones) === */}
+        <div className="mx-2" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={() => setProfile(profile === "express" ? "strict" : "express")}
+            title="Toggle validation profile"
+            className={
+              "rounded-full border px-2 py-[2px] text-[10px] font-semibold uppercase tracking-wide " +
+              (profile === "express"
+                ? "border-amber-500 text-amber-700 bg-amber-50 dark:bg-amber-900/20"
+                : "border-gray-300 text-gray-600 bg-white dark:bg-gray-800")
+            }
+          >
+            {profile === "express" ? "EXPRESS MODE" : "STRICT"}
+          </button>
+        </div>
+
+        {/* Acciones derecha del título (status + limpiar + caret) */}
+        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <span
+            className={statusIndicatorClasses}
+            title={statusComplete ? "Section complete" : "Section incomplete"}
+            aria-label={statusComplete ? "Section complete" : "Section incomplete"}
+          >
+            {statusIndicatorTitle}
+          </span>
+
           <button
             type="button"
             onClick={clearCustomer}
@@ -161,6 +240,7 @@ export default function Section1({ open, onToggle }) {
           >
             <Trash2 size={14} />
           </button>
+
           <button type="button" className="text-blue-600 dark:text-blue-400">
             {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
@@ -168,7 +248,23 @@ export default function Section1({ open, onToggle }) {
       </div>
 
       {open && (
-        <>
+        <div
+          /* Evita colapsar mientras hay foco dentro de la sección;
+             colapsa al salir si ya está completa */
+          onFocusCapture={() => setAutoCollapseDisabled(true)}
+          onBlurCapture={(e) => {
+            const leftSection = !e.currentTarget.contains(e.relatedTarget);
+            if (leftSection) {
+              setAutoCollapseDisabled(false);
+              if (allRequiredComplete) { setAutoClosing(true); setTimeout(() => { if (open) onToggle(); setAutoClosing(false); }, ANIM_MS); }
+            }
+          }}
+          className={
+            autoClosing
+              ? "transform-gpu origin-top scale-y-0 opacity-0 transition-all duration-300 ease-out overflow-hidden"
+              : "transform-gpu origin-top scale-y-100 opacity-100 transition-all duration-300 ease-out"
+          }
+        >
           {/* Autofill bait (invisible): evita que Chrome rellene NAME/ADDRESS reales */}
           <div aria-hidden="true" className="h-0 overflow-hidden">
             <input type="text" name="name" autoComplete="name" tabIndex={-1} />
@@ -186,26 +282,20 @@ export default function Section1({ open, onToggle }) {
           {/* Fila 2 dinámica */}
           <div
             className={`mt-2 grid gap-2 ${
-              showXid && showSecQ
-                ? "grid-cols-5"
-                : showXid || showSecQ
-                ? "grid-cols-4"
-                : "grid-cols-3"
+              showXid && showSecQ ? "grid-cols-5" : showXid || showSecQ ? "grid-cols-4" : "grid-cols-3"
             }`}
           >
             {/* CALLER */}
             <label className="flex flex-col gap-0.5 text-[10px] font-semibold uppercase">
               <span className="inline-flex items-center gap-0.5">
-                CALLER{requiredMissing.caller && (
-                  <span className="text-red-600">*</span>
-                )}
+                CALLER{requiredMissing.caller && <span className="text-red-600">*</span>}
               </span>
               <select
                 name="caller"
                 value={data.caller}
                 onChange={handleChange}
                 className={`rounded border px-1 py-0.5 text-[11px] dark:bg-gray-800 ${
-                  requiredMissing.caller ? "border-red-500" : "border-gray-300"
+                  requiredMissing.caller ? "border-red-500 dark:border-red-500" : "border-gray-300"
                 }`}
                 autoComplete="off"
               >
@@ -220,18 +310,14 @@ export default function Section1({ open, onToggle }) {
             {/* VERIFIED BY */}
             <label className="flex flex-col gap-0.5 text-[10px] font-semibold uppercase">
               <span className="inline-flex items-center gap-0.5">
-                VERIFIED BY{requiredMissing.verifiedBy && (
-                  <span className="text-red-600">*</span>
-                )}
+                VERIFIED BY{requiredMissing.verifiedBy && <span className="text-red-600">*</span>}
               </span>
               <select
                 name="verifiedBy"
                 value={data.verifiedBy}
                 onChange={handleChange}
                 className={`rounded border px-1 py-0.5 text-[11px] dark:bg-gray-800 ${
-                  requiredMissing.verifiedBy
-                    ? "border-red-500"
-                    : "border-gray-300"
+                  requiredMissing.verifiedBy ? "border-red-500 dark:border-red-500" : "border-gray-300"
                 }`}
                 autoComplete="off"
               >
@@ -252,45 +338,33 @@ export default function Section1({ open, onToggle }) {
             {showSecQ && (
               <label className="flex flex-col gap-0.5 text-[10px] font-semibold uppercase">
                 <span className="inline-flex items-center gap-0.5">
-                  SECURITY QUESTIONS{requiredMissing.securityQuestions && (
-                    <span className="text-red-600">*</span>
-                  )}
+                  SECURITY QUESTIONS{requiredMissing.securityQuestions && <span className="text-red-600">*</span>}
                 </span>
-                <div
-                  className={`rounded border ${
-                    requiredMissing.securityQuestions
-                      ? "border-red-500"
-                      : "border-gray-300"
-                  }`}
-                >
-                  <MultiCheckboxPopover
-                    label="Select..."
-                    options={[
-                      "DOB",
-                      "SIN",
-                      "DL",
-                      "CC",
-                      "Primary Phone #",
-                      "Secondary Phone #",
-                      "Email Address",
-                      "Address & Postal Code",
-                    ]}
-                    value={secQArr}
-                    onChange={(arr) => {
-                      // Normaliza selección: trim, sin duplicados, sin vacíos
-                      const normalized = Array.from(
-                        new Set(arr.map((s) => String(s).trim()).filter(Boolean))
-                      );
-                      handleChange({
-                        target: {
-                          name: "securityQuestions",
-                          dataset: { key: "securityQuestions" },
-                          value: normalized.join(", "),
-                        },
-                      });
-                    }}
-                  />
-                </div>
+                <MultiCheckboxPopover
+                  label="Select..."
+                  options={[
+                    "DOB",
+                    "SIN",
+                    "DL",
+                    "CC",
+                    "Primary Phone #",
+                    "Secondary Phone #",
+                    "Email Address",
+                    "Address & Postal Code",
+                  ]}
+                  value={secQArr}
+                  missing={!!requiredMissing.securityQuestions}
+                  onChange={(arr) => {
+                    const normalized = Array.from(new Set(arr.map((s) => String(s).trim()).filter(Boolean)));
+                    handleChange({
+                      target: {
+                        name: "securityQuestions",
+                        dataset: { key: "securityQuestions" },
+                        value: normalized.join(", "),
+                      },
+                    });
+                  }}
+                />
               </label>
             )}
 
@@ -300,11 +374,7 @@ export default function Section1({ open, onToggle }) {
             {/* ADDRESS */}
             {renderInput("ADDRESS", "address")}
           </div>
-
-          <div className="mt-2">
-            <CollapsibleChecklist section={1} key={resetCount + "-1"} />
-          </div>
-        </>
+        </div>
       )}
     </FormSection>
   );

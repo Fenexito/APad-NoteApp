@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import ModalFull from "./ModalFull";
 import { buildNote } from "../ui/utils/noteBuilder";
-import useFormStore from "../../store/useFormStore";
+import useFormStore from "../db/useFormStore";
 
 export default function NoteModalController() {
   const data = useFormStore((s) => s.data);
@@ -23,7 +23,7 @@ export default function NoteModalController() {
     <ModalFull
       open={open}
       onClose={() => setOpen(false)}
-      text={text}
-    />
-  );
+      text={text} />);
+
+
 }

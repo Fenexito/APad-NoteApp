@@ -128,7 +128,7 @@ export function pickScheduleToShow(note) {
   let fuD = note.resolution?.followUpDate || "";
   let fuT = note.resolution?.followUpTime || "";
 
-  // 2) si faltan, caer al texto
+  // 2) si faltan TODOS, caer al texto
   if (!techD && !techT && !fuD && !fuT) {
     const meta = parseMetaFromText(note.text || "");
     techD = meta.techDate || "";
@@ -137,10 +137,14 @@ export function pickScheduleToShow(note) {
     fuT = meta.followUpTime || "";
   }
 
+  // 🩹 Clave: si el outcome es FOLLOW UP y no hay followUp*, usar tech* como fallback
   if (outcome.includes("follow up")) {
-    if (fuD || fuT) return { label: "FOLLOW UP", d: fuD, t: fuT };
+    const d = fuD || techD;
+    const t = fuT || techT;
+    if (d || t) return { label: "FOLLOW UP", d, t };
     return { label: "", d: "", t: "" };
   }
+
   if (outcome.includes("tech")) {
     if (techD || techT) return { label: "DISPATCH", d: techD, t: techT };
     return { label: "", d: "", t: "" };

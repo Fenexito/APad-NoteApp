@@ -6,14 +6,15 @@ import "./styles/tailwind.css";
 import { ToastProvider } from "./ui/ToastContext"; // usa la ruta correcta
 
 const isFile = location.protocol === 'file:';
+const isAppsScript = /(?:^|\.)script\.google\.com$/.test(location.hostname) || /googleusercontent\.com$/.test(location.hostname);
 const Router = isFile ? HashRouter : BrowserRouter;
 
 // Registrar Service Worker solo fuera de file:// (DEV y BUILD normal)
-if ('serviceWorker' in navigator && !isFile) {
-  const swUrl = import.meta.env.DEV ? '/dev-sw.js?dev-sw' : '/sw.js';
-  const swOpts = import.meta.env.DEV ? { type: 'module' } : undefined;
-  navigator.serviceWorker.register(swUrl, swOpts).catch(console.warn);
-}
+if ('serviceWorker' in navigator && !isFile && !isAppsScript) {
+   const swUrl  = import.meta.env.DEV ? '/dev-sw.js?dev-sw' : '/sw.js';
+   const swOpts = import.meta.env.DEV ? { type: 'module' } : undefined;
+   navigator.serviceWorker.register(swUrl, swOpts).catch(console.warn);
+ }
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

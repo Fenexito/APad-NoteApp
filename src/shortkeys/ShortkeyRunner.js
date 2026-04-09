@@ -118,6 +118,31 @@ function runFlow(shortcut, element) {
   });
 }
 
+/* -------------------- FIX: Confirmar hacia React -------------------- */
+/** Confirma el nuevo valor en inputs/textarea controlados por React. */
+function commitValueToReactInput(el, nextValue, caretPos) {
+  // Intenta usar el setter nativo del prototipo (el que React intercepta)
+  const proto = el instanceof HTMLTextAreaElement
+    ? HTMLTextAreaElement.prototype
+    : HTMLInputElement.prototype;
+
+  const valueSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+  if (valueSetter) {
+    valueSetter.call(el, nextValue);
+  } else {
+    // Fallback por si algún browser raro no expone el setter
+    el.value = nextValue;
+  }
+
+  // Recoloca el caret (si aplica)
+  if (typeof caretPos === "number") {
+    try { el.setSelectionRange(caretPos, caretPos); } catch {}
+  }
+
+  // Dispara el evento de entrada que React escucha
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
 // -------------------- Runner --------------------
 export function initShortkeyRunner({
   selector = "textarea.shortkey-enabled, input.shortkey-enabled",
@@ -142,9 +167,20 @@ export function initShortkeyRunner({
     const tokenStart = info.start;
     const tokenEnd = info.end;
 
-    // Filtro por "startsWith" el key
+    // Lee etiquetas permitidas en el elemento (e.g. data-sk-tags="CX ISSUE, TS STEPS")
+    const allowedTags = (el.getAttribute("data-sk-tags") || "")
+      .split(",")
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean);
+
+    // Filtro por key + (opcional) etiquetas
     const filtered = shortcuts
       .filter((s) => s.key && s.key.toLowerCase().startsWith(q.toLowerCase()))
+      .filter((s) => {
+        if (allowedTags.length === 0) return true; // si no especificas, acepta todos
+        const skTags = (s.tags || []).map((t) => String(t).toUpperCase());
+        return skTags.some((t) => allowedTags.includes(t));
+      })
       .slice(0, 20);
 
     if (filtered.length === 0) return;
@@ -168,12 +204,11 @@ export function initShortkeyRunner({
         const safeStart = Math.max(0, Math.min(tokenStart, currentText.length));
         const safeEnd = Math.max(safeStart, Math.min(tokenEnd, currentText.length));
 
-        el.value = replaceRange(currentText, safeStart, safeEnd, output);
-
-        // Colocar caret al final del texto insertado
+        const nextText = replaceRange(currentText, safeStart, safeEnd, output);
         const newPos = safeStart + output.length;
-        el.setSelectionRange(newPos, newPos);
-        el.dispatchEvent(new Event("input", { bubbles: true }));
+
+        // === FIX aplicado aquí: confirmar hacia React ===
+        commitValueToReactInput(el, nextText, newPos);
       } finally {
         el.__shortkeyRunning = false;
       }

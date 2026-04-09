@@ -1,7 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
-import { ChevronRight, Search, X, Minimize, StretchVertical } from "lucide-react";
-import { groupNotesByMonthDay, formatMonth, formatDay } from "../../utils/date";
-import { parseMetaFromText } from "../../utils/history";
+import { useEffect, useMemo, useState, useRef } from "react";
+import {
+  ChevronRight,
+  Search,
+  X,
+  Minimize,
+  StretchVertical,
+  Upload,
+  Download,
+} from "lucide-react";
+import { groupNotesByMonthDay, formatMonth, formatDay } from "../UI/UTILS/date";
+import { parseMetaFromText } from "./history";
+import { useToast } from "../UI/ToastContext";
+import { getNotes, addNote, deleteNote } from "../db/notes";
 
 const GT_TZ = "America/Guatemala";
 
@@ -39,7 +49,46 @@ function getWorkflow(n) {
   return meta.workflow || "";
 }
 function getResolutionText(n) {
-  return pick(n, "resolution.summary") ?? n.resolution?.outcome ?? n.outcome ?? "";
+  return resolveOutcome(n).text;
+ }
+
+/** Normaliza la “resolución” para badge/color:
+ *  Busca en resolution.summary/outcome, en note.outcome, en meta y si no,
+ *  lo deduce del texto ("EOC", "Follow Up", "Tech/Dispatch"). */
+function resolveOutcome(note) {
+  const fromFields =
+    pick(note, "resolution.summary") ||
+    pick(note, "resolution.outcome") ||
+    note.outcome ||
+    "";
+  const meta = parseMetaFromText(note.text || "");
+  const fromMeta = meta.resolutionText || meta.outcome || "";
+  let raw = String(fromFields || fromMeta || "").trim();
+
+  // Heurísticas sobre el texto si sigue vacío o es muy genérico
+  if (!raw) {
+    const txt = String(note.text || "");
+    if (/\bfollow[\s-]?up\b/i.test(txt)) raw = "Follow Up";
+    else if (/\b(tech|dispatch(?:ed)?)\b/i.test(txt)) raw = "Tech Booked";
+    else if (/\b(eoc|end of call|resolved)\b/i.test(txt)) raw = "EOC";
+  }
+
+  const lc = raw.toLowerCase();
+  let category = "";
+  if (/\bfollow[\s-]?up\b/.test(lc)) category = "followup";
+  else if (/\b(tech|dispatch(?:ed)?)\b/.test(lc)) category = "tech";
+  else if (/\beoc\b/.test(lc) || lc.startsWith("yes") || lc.includes("resolved")) category = "yes";
+  else if (lc.startsWith("no") || lc.includes("not resolved")) category = "no";
+
+  // Texto visible en badge (fallbacks simpáticos)
+  const text =
+    raw ||
+    (category === "followup" ? "Follow Up" :
+     category === "tech" ? "Tech Booked" :
+     category === "yes" ? "EOC" :
+     category === "no" ? "No" : "");
+
+  return { text, category };
 }
 
 /** Decide agenda a mostrar (DISPATCH / FOLLOW UP) */
@@ -78,13 +127,22 @@ function getSpecialTicket(note) {
   const txt = (note.text || "").toUpperCase();
   const meta = parseMetaFromText(note.text || "");
 
-  const bosr = note.bosrTicket || meta.bosrTicket || (txt.includes("BOSR TICKET") ? (note.resolution?.ticketSpecial || meta.specialTicket) : "");
+  const bosr =
+    note.bosrTicket ||
+    meta.bosrTicket ||
+    (txt.includes("BOSR TICKET") ? note.resolution?.ticketSpecial || meta.specialTicket : "");
   if (bosr) return { label: "BOSR TICKET", value: bosr };
 
-  const nc = note.ncTicket || meta.ncTicket || (txt.includes("NC TICKET") ? (note.resolution?.ticketSpecial || meta.specialTicket) : "");
+  const nc =
+    note.ncTicket ||
+    meta.ncTicket ||
+    (txt.includes("NC TICKET") ? note.resolution?.ticketSpecial || meta.specialTicket : "");
   if (nc) return { label: "NC TICKET", value: nc };
 
-  const emt = note.emtTicket || meta.emtTicket || (txt.includes("EMT TICKET") ? (note.resolution?.ticketSpecial || meta.specialTicket) : "");
+  const emt =
+    note.emtTicket ||
+    meta.emtTicket ||
+    (txt.includes("EMT TICKET") ? note.resolution?.ticketSpecial || meta.specialTicket : "");
   if (emt) return { label: "EMT TICKET", value: emt };
 
   const fallback = note.resolution?.ticketSpecial || meta.specialTicket || "";
@@ -95,18 +153,24 @@ function getSpecialTicket(note) {
 
 /** Tonos por outcome (badge/contorno base) */
 function outcomeTone(n) {
+  const { category } = resolveOutcome(n);
   const out = (n.resolution?.outcome || n.outcome || "").toLowerCase();
-  const isNo = out.startsWith("no");
   const hasBOSR = !!n.bosrTicket || out.includes("bosr");
   const hasNC = !!n.ncTicket || out.includes("nc ticket");
-  const isFollowUp = out.includes("follow up");
-  const isTech = out.includes("tech booked") || out.includes("tech");
 
-  if (isNo && (hasBOSR || hasNC)) return { badge: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200", ring: "ring-1 ring-blue-200 dark:ring-blue-700/50" };
-  if (isFollowUp) return { badge: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200", ring: "ring-1 ring-rose-200 dark:ring-rose-700/50" };
-  if (isTech) return { badge: "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200", ring: "ring-1 ring-violet-200 dark:ring-violet-700/50" };
-  if (out.startsWith("yes")) return { badge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200", ring: "ring-1 ring-emerald-200 dark:ring-emerald-700/50" };
-  return { badge: "bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200", ring: "ring-1 ring-slate-200 dark:ring-slate-700/50" };
+  if (category === "no" && (hasBOSR || hasNC))
+    return { badge: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200", ring: "ring-1 ring-blue-200 dark:ring-blue-700/50" };
+  if (category === "followup")
+    return { badge: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200", ring: "ring-1 ring-rose-200 dark:ring-rose-700/50" };
+  if (category === "tech")
+    return { badge: "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200", ring: "ring-1 ring-violet-200 dark:ring-violet-700/50" };
+  if (category === "yes")
+    return { badge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200", ring: "ring-1 ring-emerald-200 dark:ring-emerald-700/50" };
+  return {
+    badge:
+      "bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200",
+    ring: "ring-1 ring-slate-200 dark:ring-slate-700/50",
+  };
 }
 
 /** Chevron */
@@ -119,7 +183,9 @@ const Chevron = ({ open }) => (
 
 /** Density toggle con íconos (persistente) */
 function useDensity() {
-  const [density, setDensity] = useState(() => localStorage.getItem("history_density") || "comfortable");
+  const [density, setDensity] = useState(
+    () => localStorage.getItem("history_density") || "comfortable"
+  );
   useEffect(() => {
     localStorage.setItem("history_density", density);
   }, [density]);
@@ -132,10 +198,11 @@ function DensityToggle({ density, onChange }) {
     <div className="inline-flex items-center rounded-full border border-blue-100/60 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 backdrop-blur shadow-sm overflow-hidden">
       <button
         onClick={() => onChange("comfortable")}
-        className={`${baseBtn} ${density === "comfortable"
+        className={`${baseBtn} ${
+          density === "comfortable"
             ? "bg-blue-600 text-white"
             : "text-blue-700 dark:text-blue-300 hover:bg-blue-50/60 dark:hover:bg-slate-700/60"
-          }`}
+        }`}
         title="Comfortable"
         aria-label="Comfortable density"
       >
@@ -143,10 +210,11 @@ function DensityToggle({ density, onChange }) {
       </button>
       <button
         onClick={() => onChange("compact")}
-        className={`${baseBtn} border-l border-blue-100/60 dark:border-slate-700 ${density === "compact"
+        className={`${baseBtn} border-l border-blue-100/60 dark:border-slate-700 ${
+          density === "compact"
             ? "bg-blue-600 text-white"
             : "text-blue-700 dark:text-blue-300 hover:bg-blue-50/60 dark:hover:bg-slate-700/60"
-          }`}
+        }`}
         title="Compact"
         aria-label="Compact density"
       >
@@ -154,6 +222,79 @@ function DensityToggle({ density, onChange }) {
       </button>
     </div>
   );
+}
+
+/* ========================= Adaptador de backups viejos ========================= */
+/** Convierte backups viejos (finalNoteText + formData + timestamp)
+ *  o backups nuevos, al esquema actual de notas. */
+function adaptBackupPayloadToCurrent(payload) {
+  // Acepta: [ ... ] o { notes: [ ... ] }
+  const list = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.notes)
+    ? payload.notes
+    : [];
+
+  if (!Array.isArray(list)) return [];
+
+  const looksLegacy = !!list[0]?.finalNoteText || !!list[0]?.formData;
+
+  const safeId =
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID.bind(crypto)
+      : () => String(Date.now()) + Math.random().toString(36).slice(2);
+
+  const normNew = (n) => {
+    const createdAt =
+      n.createdAt || n.created || n.timestamp || new Date().toISOString();
+    const id = n.id || safeId();
+    const text = n.text || "";
+    return {
+      ...n,
+      id,
+      createdAt,
+      created: n.created ?? createdAt,
+      timestamp: n.timestamp ?? createdAt,
+      text,
+    };
+  };
+
+  const mapLegacy = (it) => {
+    const fd = it.formData || {};
+    const clean = (v) => (typeof v === "string" ? v.trim() : v);
+    const createdAt =
+      it.timestamp || it.createdAt || new Date().toISOString();
+    const id = it.id || safeId();
+    const text = it.finalNoteText || it.text || "";
+
+    return {
+      id,
+      createdAt,
+      created: createdAt,
+      timestamp: createdAt,
+      text,
+      // Campos útiles para búsqueda/pills si existen
+      ban: clean(fd.ban) || undefined,
+      cid: clean(fd.cid) || undefined,
+      name: clean(fd.name) || undefined,
+      cbr: clean(fd.cbr) || undefined,
+      ticket:
+        fd.ticketInput && fd.ticketInput !== "0"
+          ? clean(fd.ticketInput)
+          : undefined,
+    };
+  };
+
+  const normalized = list.map((x) => (looksLegacy ? mapLegacy(x) : normNew(x)));
+
+  // De-dupe por id o por (text+createdAt)
+  const seen = new Set();
+  return normalized.filter((n) => {
+    const key = n.id || `${n.text}@@${n.createdAt}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /* ========================= Tarjeta de Nota ========================= */
@@ -198,24 +339,46 @@ function NoteCard({ n, selected, dense, onOpenView, setSelectedNote }) {
       }}
     >
       {/* Fila 1: Identificación + Resolution badge */}
-      <div className={`flex items-center justify-between ${rowTextSize} text-slate-800 dark:text-slate-200`}>
+      <div
+        className={`flex items-center justify-between ${rowTextSize} text-slate-800 dark:text-slate-200`}
+      >
         {/* Lado izquierdo: BAN/CID/NAME/CBR */}
-        <div className={`flex-1 min-w-0 flex items-center gap-x-3 gap-y-1 flex-wrap ${dense ? "leading-tight" : ""}`}>
-          <span><b className="mr-1">BAN:</b>{n.ban || "--"}</span>
-          <span><b className="mr-1">CID:</b>{n.cid || "--"}</span>
-          <span className="max-w-[160px] truncate"><b className="mr-1">NAME:</b>{n.name || "--"}</span>
-          <span><b className="mr-1">CBR:</b>{n.cbr || "--"}</span>
+        <div
+          className={`flex-1 min-w-0 flex items-center gap-x-3 gap-y-1 flex-wrap ${
+            dense ? "leading-tight" : ""
+          }`}
+        >
+          <span>
+            <b className="mr-1">BAN:</b>
+            {n.ban || "--"}
+          </span>
+          <span>
+            <b className="mr-1">CID:</b>
+            {n.cid || "--"}
+          </span>
+          <span className="max-w-[160px] truncate">
+            <b className="mr-1">NAME:</b>
+            {n.name || "--"}
+          </span>
+          <span>
+            <b className="mr-1">CBR:</b>
+            {n.cbr || "--"}
+          </span>
         </div>
 
         {/* Badge de RESOLUTION visible y consistente */}
         <span
           className={`
-            ml-2 inline-flex items-center rounded-full px-2 ${dense ? "py-[1px]" : "py-0.5"} font-semibold ${tone.badge}
+            ml-2 inline-flex items-center rounded-full px-2 ${
+              dense ? "py-[1px]" : "py-0.5"
+            } font-semibold ${tone.badge}
             border border-transparent shrink-0 overflow-hidden max-w-[45%]
           `}
           title="Outcome / Resolution"
         >
-          <span className={`truncate ${dense ? "text-[11px]" : "text-[12px]"}`}>{resolution}</span>
+          <span className={`truncate ${dense ? "text-[11px]" : "text-[12px]"}`}>
+            {resolution}
+          </span>
         </span>
       </div>
 
@@ -223,7 +386,9 @@ function NoteCard({ n, selected, dense, onOpenView, setSelectedNote }) {
       {dense && (
         <>
           {/* Fila 2: SERVICE + WORKFLOW */}
-          <div className={`mt-1 flex items-center gap-2 flex-wrap ${chipTextSize} text-slate-700 dark:text-slate-300`}>
+          <div
+            className={`mt-1 flex items-center gap-2 flex-wrap ${chipTextSize} text-slate-700 dark:text-slate-300`}
+          >
             <span className="inline-flex items-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-[2px]">
               <b className="mr-1">SERVICE:</b>
               <span className="truncate max-w-[220px]">{service}</span>
@@ -235,10 +400,13 @@ function NoteCard({ n, selected, dense, onOpenView, setSelectedNote }) {
           </div>
 
           {/* Fila 3: Agenda + Tickets */}
-          <div className={`mt-1 flex items-center gap-2 flex-wrap ${chipTextSize} text-slate-700 dark:text-slate-300`}>
+          <div
+            className={`mt-1 flex items-center gap-2 flex-wrap ${chipTextSize} text-slate-700 dark:text-slate-300`}
+          >
             {schedule.label && (schedule.d || schedule.t) && (
               <span className="inline-flex items-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-[2px]">
-                <b className="mr-1">{schedule.label}:</b>{schedule.d} {schedule.t || ""}
+                <b className="mr-1">{schedule.label}:</b>
+                {schedule.d} {schedule.t || ""}
               </span>
             )}
             {ticketValue && (
@@ -278,29 +446,161 @@ export default function HistoryList({
   const [collapsedMonths, setCollapsedMonths] = useState({});
   const [collapsedDays, setCollapsedDays] = useState({}); // { [monthKey]: { [dayKey]: boolean } }
 
+  // toast & file input
+  const toast = useToast?.() || null;
+  const importRef = useRef(null);
+  const importModeRef = useRef("merge"); // "merge" | "replace"
+
+  // helpers export/import
+  function tsName() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const name = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(
+      d.getHours()
+    )}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    return name;
+  }
+
+  function handleExportAll() {
+    try {
+      const data = Array.isArray(notes) ? notes : [];
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `apad-notes-export-${tsName()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast?.success?.("Notas exportadas.");
+    } catch (err) {
+      console.error(err);
+      toast?.error?.("No se pudo exportar.");
+    }
+  }
+
+    async function importNotes(newNotes, mode = "merge") {
+    try {
+      const list = Array.isArray(newNotes) ? newNotes : [];
+      // Normaliza timestamps
+      const normalized = list.map((n) => {
+        const createdOrig = getCreated(n) ?? Date.now();
+        return {
+          ...n,
+          createdAt: n.createdAt ?? createdOrig,
+          created: n.created ?? createdOrig,
+          timestamp: n.timestamp ?? createdOrig,
+        };
+      });
+
+      const existing = await getNotes();
+
+      if (mode === "replace") {
+        // Borrar todo y cargar desde cero
+        for (const n of existing) {
+          if (n?.id != null) {
+            // eslint-disable-next-line no-await-in-loop
+            await deleteNote(n.id);
+          }
+        }
+        for (const n of normalized) {
+          // eslint-disable-next-line no-await-in-loop
+          await addNote(n);
+        }
+      } else {
+        // MERGE: no borrar; actualizar si coincide por id o por (text+createdAt)
+        const byId = new Map(existing.map((e) => [e.id, e]));
+        const byComposite = new Map(
+          existing.map((e) => [`${e.text || ""}@@${getCreated(e) || ""}`, e])
+        );
+        for (const n of normalized) {
+          const key = `${n.text || ""}@@${getCreated(n) || ""}`;
+          const same = n.id && byId.get(n.id);
+          const comp = byComposite.get(key);
+          const upsert = comp && !same ? { ...n, id: comp.id } : n;
+          // eslint-disable-next-line no-await-in-loop
+          await addNote(upsert); // put: crea o actualiza por id
+        }
+      }
+
+      toast?.success?.(mode === "replace" ? "Notas importadas (reemplazo)." : "Notas importadas (merge).");
+      window.dispatchEvent?.(new CustomEvent("apad:notes-imported"));
+      setTimeout(() => { try { location.reload(); } catch {} }, 60);
+    } catch (e) {
+      console.error(e);
+      toast?.error?.("No se pudo importar.");
+    }
+  }
+
+  async function onPickImportFile(e) {
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+
+      // Adaptar formato viejo o aceptar el nuevo
+      const normalizedNotes = adaptBackupPayloadToCurrent(parsed);
+
+    const mode = importModeRef.current || "merge";
+      await importNotes(normalizedNotes, mode);    } catch (err) {
+
+      console.error(err);
+      toast?.error?.("Archivo inválido o error al importar.");
+    } finally {
+      if (importRef.current) importRef.current.value = "";
+    }
+  }
+
   /* ========= filtro en tiempo real ========= */
+  // --- Búsqueda avanzada: soporta frases "entre comillas", exclusiones con -palabra y busca en el texto completo ---
+  function tokenizeQuery(q) {
+    // Extrae "frases exactas" y términos sueltos; soporta -negaciones
+    // Ej:  wifi "no navega" -router
+    const tokens = [];
+    const re = /"([^"]+)"|(\S+)/g;
+    let m;
+    while ((m = re.exec(q))) {
+      const raw = (m[1] ?? m[2] ?? "").trim();
+      if (!raw) continue;
+      const neg = raw.startsWith("-");
+      const val = (neg ? raw.slice(1) : raw).toLowerCase();
+      if (val) tokens.push({ neg, val });
+    }
+    const positives = tokens.filter(t => !t.neg).map(t => t.val);
+    const negatives = tokens.filter(t =>  t.neg).map(t => t.val);
+    return { positives, negatives };
+  }
+
   const filteredNotes = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = query.trim();
     if (!q) return notes;
+    const { positives, negatives } = tokenizeQuery(q);
+    if (positives.length === 0 && negatives.length === 0) return notes;
+
     return notes.filter((n) => {
       const meta = parseMetaFromText(n.text || "");
-      const fields = [
-        n.ban,
-        n.cid,
-        n.cbr,
-        n.name,
-        n.ticket,
-        n.bosrTicket,
-        n.ncTicket,
-        n.emtTicket,
+      // Haystack: campos clave + TODO el texto de la nota
+      const hay = [
+        n.ban, n.cid, n.cbr, n.name,
+        n.ticket, n.bosrTicket, n.ncTicket, n.emtTicket,
         getService(n) || meta.service,
         getWorkflow(n) || meta.workflow,
         getResolutionText(n) || meta.resolutionText,
         meta.specialTicket,
+        n.text, // contenido completo
       ]
         .filter(Boolean)
-        .map((x) => String(x).toLowerCase());
-      return fields.some((f) => f.includes(q));
+        .join(" \n ")
+        .toLowerCase();
+
+      // Debe cumplir: todas las positivas (AND) y ninguna negativa presente
+      const hasAllPos = positives.every(t => hay.includes(t));
+      const hasNeg   = negatives.some(t => hay.includes(t));
+      return hasAllPos && !hasNeg;
     });
   }, [notes, query]);
 
@@ -403,7 +703,6 @@ export default function HistoryList({
       setSelectedNote && setSelectedNote(null);
     };
     window.addEventListener("keydown", onEsc);
-    // Mantenemos capture:true para priorizar la detección, pero ahora excluimos la barra y modales
     document.addEventListener("pointerdown", onOutside, { capture: true });
     return () => {
       window.removeEventListener("keydown", onEsc);
@@ -441,7 +740,7 @@ export default function HistoryList({
               if (e.key === "Escape") setQuery("");
             }}
             type="text"
-            placeholder="Search by BAN, CID, CBR, NAME, TICKET or BOSR"
+            placeholder="Search using key words, ban/cid/name/ticket, etc"
             className="
               w-full bg-transparent outline-none px-3 py-2 text-[14px]
               placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-800 dark:text-slate-100
@@ -460,6 +759,36 @@ export default function HistoryList({
         </div>
 
         <DensityToggle density={density} onChange={setDensity} />
+
+        {/* Import / Export (icon-only, discretos, a la derecha) */}
+        <div className="flex items-center gap-1 ml-1">
+          <button
+            onClick={handleExportAll}
+            className="inline-flex items-center justify-center p-1.5 rounded-full border border-emerald-200 bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100/70 dark:border-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200 dark:hover:bg-emerald-900/60 transition"
+            title="Export all notes"
+            aria-label="Export all notes"
+          >
+            <Download size={14} />
+          </button>
+          <button
+            onMouseDown={(e) => {
+              importModeRef.current = (e.shiftKey || e.altKey) ? "replace" : "merge";
+            }}
+            onClick={() => importRef.current?.click()}
+            className="inline-flex items-center justify-center p-1.5 rounded-full border border-violet-200 bg-violet-50/70 text-violet-700 hover:bg-violet-100/70 dark:border-violet-700 dark:bg-violet-900/40 dark:text-violet-200 dark:hover:bg-violet-900/60 transition"
+            title="Import notes (JSON) — Click: Merge • Shift/Alt+Click: Replace"
+            aria-label="Import notes"
+          >
+            <Upload size={14} />
+          </button>
+          <input
+            ref={importRef}
+            type="file"
+            accept="application/json"
+            onChange={onPickImportFile}
+            className="hidden"
+          />
+        </div>
       </div>
 
       {/* Sin resultados */}
@@ -479,8 +808,7 @@ export default function HistoryList({
                 parseDate(getCreated(b)).getTime() -
                 parseDate(getCreated(a)).getTime()
             );
-            const isDayCollapsed =
-              !!collapsedDays?.[currentMonthKey]?.[dayKey];
+            const isDayCollapsed = !!collapsedDays?.[currentMonthKey]?.[dayKey];
 
             return (
               <div
@@ -490,11 +818,17 @@ export default function HistoryList({
                 {/* Encabezado de Día */}
                 <button
                   onClick={() => toggleDay(currentMonthKey, dayKey)}
-                  className={`flex w-full items-center justify-between px-3 ${dense ? "py-1.5" : "py-2"}`}
+                  className={`flex w-full items-center justify-between px-3 ${
+                    dense ? "py-1.5" : "py-2"
+                  }`}
                 >
                   <div className="flex items-center gap-2">
                     <Chevron open={!isDayCollapsed} />
-                    <span className={`font-semibold text-blue-700 dark:text-blue-300 ${dense ? "text-sm" : "text-base"}`}>
+                    <span
+                      className={`font-semibold text-blue-700 dark:text-blue-300 ${
+                        dense ? "text-sm" : "text-base"
+                      }`}
+                    >
                       {formatDay(dayKey)}
                     </span>
                   </div>
@@ -545,11 +879,17 @@ export default function HistoryList({
               {/* Encabezado de Mes */}
               <button
                 onClick={() => toggleMonth(monthKey)}
-                className={`flex w-full items-center justify-between px-3 ${dense ? "py-1.5" : "py-2"}`}
+                className={`flex w-full items-center justify-between px-3 ${
+                  dense ? "py-1.5" : "py-2"
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <Chevron open={!isMonthCollapsed} />
-                  <span className={`font-bold text-blue-700 dark:text-blue-300 ${dense ? "text-base" : "text-lg"}`}>
+                  <span
+                    className={`font-bold text-blue-700 dark:text-blue-300 ${
+                      dense ? "text-base" : "text-lg"
+                    }`}
+                  >
                     {formatMonth(monthKey)}
                   </span>
                 </div>
@@ -567,8 +907,7 @@ export default function HistoryList({
                           parseDate(getCreated(b)).getTime() -
                           parseDate(getCreated(a)).getTime()
                       );
-                      const isDayCollapsed =
-                        !!collapsedDays?.[monthKey]?.[dayKey];
+                      const isDayCollapsed = !!collapsedDays?.[monthKey]?.[dayKey];
 
                       return (
                         <div
@@ -578,11 +917,17 @@ export default function HistoryList({
                           {/* Encabezado de Día */}
                           <button
                             onClick={() => toggleDay(monthKey, dayKey)}
-                            className={`flex w-full items-center justify-between px-3 ${dense ? "py-1.5" : "py-2"}`}
+                            className={`flex w-full items-center justify-between px-3 ${
+                              dense ? "py-1.5" : "py-2"
+                            }`}
                           >
                             <div className="flex items-center gap-2">
                               <Chevron open={!isDayCollapsed} />
-                              <span className={`font-semibold text-blue-700 dark:text-blue-300 ${dense ? "text-sm" : "text-base"}`}>
+                              <span
+                                className={`font-semibold text-blue-700 dark:text-blue-300 ${
+                                  dense ? "text-sm" : "text-base"
+                                }`}
+                              >
                                 {formatDay(dayKey)}
                               </span>
                             </div>

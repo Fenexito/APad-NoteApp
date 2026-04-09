@@ -15,6 +15,8 @@ import ReactFlow, {
   applyNodeChanges,
   ConnectionMode,
 } from "reactflow";
+import { BezierEdge } from "reactflow";
+import { ReactFlowProvider, useReactFlow } from "reactflow";
 import "reactflow/dist/style.css";
 
 /** ================== Utils ================== **/
@@ -24,7 +26,21 @@ function sanitizeId(v) {
     .replace(/\s+/g, "_")
     .toLowerCase()
     .replace(/[^a-z0-9_-]/g, "")
-    .replace(/^_+|_+$/g, "");
+    .replace(/^_+/, ""); // ⚠️ ya NO quitamos "_" al final
+}
+// Inserta "_" en la posición del caret al presionar Space
+function insertUnderscoreAtCaret(e, current, setValueCb) {
+  const el = e.currentTarget;
+  if (!el) return;
+  const start = el.selectionStart ?? current.length;
+  const end = el.selectionEnd ?? start;
+  const next = (current || "").slice(0, start) + "_" + (current || "").slice(end);
+  setValueCb(next);
+  requestAnimationFrame(() => {
+    try {
+      el.setSelectionRange(start + 1, start + 1);
+    } catch {}
+  });
 }
 function ensureTemplateStep(steps) {
   const hasTpl = (steps || []).some((s) => s.type === "template");
@@ -62,9 +78,9 @@ function stepsToFlow(steps) {
         edges.push({
           id: `${s.id}__${oi}__${opt.nextStep}`,
           source: s.id,
-          sourceHandle: `opt-${oi}`, // handle por opción
+          sourceHandle: `opt-${oi}`,
           target: opt.nextStep,
-          type: "bezier",            // curvas
+          type: "bezier",
           animated: false,
         });
       });
@@ -280,6 +296,37 @@ export default function ShortkeyFlowEditor({ value, onChange }) {
     setSelectedNodeId(null);
   };
 
+  // Duplicar nodo (solo select)
+  const duplicateNode = (nodeId) => {
+    if (nodeId === "result") return;
+    const src = steps.find((s) => s.id === nodeId && s.type === "select");
+    if (!src) return;
+    // Generar ID único basado en original
+    const base = `${src.id}_copy`;
+    let newId = base;
+    let i = 1;
+    while (steps.some((s) => s.id === newId)) {
+      newId = `${base}_${i++}`;
+    }
+    // Posición desplazada
+    const pos = src.pos || { x: 100, y: 160 };
+    const newPos = { x: pos.x + 40, y: pos.y + 30 };
+    const clone = {
+      ...src,
+      id: newId,
+      pos: newPos,
+      // clonar opciones por valor
+      options: (src.options || []).map((o) => ({ ...o })),
+    };
+    const next = [
+      ...steps.filter((s) => s.type === "select"),
+      clone,
+      steps[tplIndex],
+    ];
+    commit(next);
+    setSelectedNodeId(newId);
+  };
+
   // Conexión por arrastre — usa handle por opción (opt-idx)
   const onConnect = useCallback(
     (params) => {
@@ -334,8 +381,14 @@ export default function ShortkeyFlowEditor({ value, onChange }) {
     if (steps.some((s) => s.id === newId)) return alert("ID ya existe.");
 
     const oldId = selectedStep.id;
+    const tokenRe = new RegExp(`\\{${oldId}\\}`, "g");
     const next = steps.map((s) => {
       if (s.id === oldId) return { ...s, id: newId };
+      if (s.type === "template") {
+        const tpl = s.template || "";
+        const replaced = tpl.replace(tokenRe, `{${newId}}`);
+        return { ...s, template: replaced };
+      }
       if (s.type !== "select") return s;
       const options = (s.options || []).map((o) =>
         o.nextStep === oldId ? { ...o, nextStep: newId } : o
@@ -365,17 +418,17 @@ export default function ShortkeyFlowEditor({ value, onChange }) {
     if (!selectedStep || selectedStep.type !== "select") return;
     const opts = [...(selectedStep.options || [])];
     opts.push({ label: "", value: "", nextStep: "result" });
-    const next = steps.map((s) => (s.id === selectedStep.id ? { ...s, options: opts } : s));
+    const next = steps.map((s) => (s.id === selectedNodeId ? { ...s, options: opts } : s));
     commit(next);
-    setSelectedNodeId(selectedStep.id);
+    setSelectedNodeId(selectedNodeId);
   };
   const removeOption = (idx) => {
     if (!selectedStep || selectedStep.type !== "select") return;
     const opts = [...(selectedStep.options || [])];
     opts.splice(idx, 1);
-    const next = steps.map((s) => (s.id === selectedStep.id ? { ...s, options: opts } : s));
+    const next = steps.map((s) => (s.id === selectedNodeId ? { ...s, options: opts } : s));
     commit(next);
-    setSelectedNodeId(selectedStep.id);
+    setSelectedNodeId(selectedNodeId);
   };
 
   const renderedNodes = useMemo(
@@ -392,7 +445,7 @@ export default function ShortkeyFlowEditor({ value, onChange }) {
       {/* Panel derecho: 1fr + 340px en lg */}
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-3">
         {/* Canvas */}
-        <div className="rounded-xl border border-blue-100 dark:border-slate-700 overflow-hidden bg-white/60 dark:bg-slate-900/60">
+        <div className="rounded-xl border border-blue-100 dark:border-slate-700 overflow-visible bg-white/60 dark:bg-slate-900/60">
           <div className="flex items-center justify-between px-2 py-1 border-b border-blue-100 dark:border-slate-700">
             <div className="text-[12px] font-semibold text-slate-600 dark:text-slate-300">Flow</div>
             <div className="flex items-center gap-2">
@@ -412,38 +465,32 @@ export default function ShortkeyFlowEditor({ value, onChange }) {
                   Eliminar Nodo
                 </button>
               )}
+              {selectedNodeId && selectedNodeId !== "result" && (
+              <button
+                onClick={() => duplicateNode(selectedNodeId)}
+                className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[12px] font-semibold text-emerald-700 hover:bg-emerald-100"
+                type="button"
+              >
+                Duplicar Nodo
+              </button>
+            )}
             </div>
           </div>
 
-          <div className="h-[460px]">
-            <ReactFlow
+          {/* React Flow con Provider + canvas separado */}
+          <ReactFlowProvider>
+            <FlowCanvas
               nodes={renderedNodes}
               edges={edges}
               nodeTypes={nodeTypes}
+              edgeTypes={{ bezier: BezierEdge }}
               onNodesChange={onNodesChange}
               onConnect={onConnect}
               onNodeDragStop={onNodeDragStop}
-              onNodeClick={(_, n) => setSelectedNodeId(n?.id || null)}
+              onNodeClick={(n) => setSelectedNodeId(n?.id || null)}
               onPaneClick={() => setSelectedNodeId(null)}
-              fitView
-              fitViewOptions={{ padding: 0.15 }}
-              /* Scroll = zoom (ya no pan vertical) */
-              panOnScroll={false}
-              zoomOnScroll={true}
-              zoomOnDoubleClick={false}
-              panOnDrag
-              selectionOnDrag={false}
-              snapToGrid={false}
-              connectionMode={ConnectionMode.Loose}
-              /* Líneas curvas por defecto */
-              defaultEdgeOptions={{ type: "bezier" }}
-              proOptions={{ hideAttribution: true }}
-            >
-              <MiniMap zoomable pannable />
-              <Controls />
-              <Background variant="lines" gap={16} />
-            </ReactFlow>
-          </div>
+            />
+          </ReactFlowProvider>
         </div>
 
         {/* Panel de propiedades: ID + Título + Opciones (sin Next step) */}
@@ -464,6 +511,12 @@ export default function ShortkeyFlowEditor({ value, onChange }) {
                 <input
                   className="w-full rounded-md border border-blue-200/60 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 px-2 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-blue-300"
                   value={selectedStep.id}
+                  onKeyDown={(e) => {
+                    if (e.key === " ") {
+                      e.preventDefault();
+                      insertUnderscoreAtCaret(e, selectedStep.id, (v) => updateSelectedId(v));
+                    }
+                  }}
                   onChange={(e) => updateSelectedId(e.target.value)}
                   placeholder="id_variable"
                 />
@@ -545,5 +598,127 @@ export default function ShortkeyFlowEditor({ value, onChange }) {
         </aside>
       </div>
     </>
+  );
+}
+
+// === Canvas bajo ReactFlowProvider (usa useReactFlow sin romper) ===
+function FlowCanvas({
+  nodes,
+  edges,
+  nodeTypes,
+  edgeTypes,
+  onNodesChange,
+  onConnect,
+  onNodeDragStop,
+  onNodeClick,
+  onPaneClick,
+}) {
+  const [flowHeight, setFlowHeight] = useState(600);
+  const rf = useReactFlow();
+
+  // Calcular altura basada en las posiciones de los nodos
+  const calculateHeight = useCallback(() => {
+    try {
+      const allNodes = rf.getNodes?.() || nodes || [];
+      
+      if (allNodes.length === 0) {
+        return 600; // Altura por defecto
+      }
+
+      // Encontrar el nodo más abajo
+      let maxY = 0;
+      let maxBottom = 0;
+      
+      for (const node of allNodes) {
+        const nodeY = node.position.y;
+        const nodeHeight = 120; // Altura estimada de un nodo
+        const nodeBottom = nodeY + nodeHeight;
+        
+        if (nodeBottom > maxBottom) {
+          maxBottom = nodeBottom;
+        }
+        if (nodeY > maxY) {
+          maxY = nodeY;
+        }
+      }
+
+      // Usar el mayor valor entre maxY y maxBottom, con un margen
+      const calculatedHeight = Math.max(maxY, maxBottom) + 200;
+      
+      // Limitar la altura máxima para evitar crecimiento infinito
+      const finalHeight = Math.min(Math.max(600, calculatedHeight), 2000);
+      
+      return finalHeight;
+    } catch (error) {
+      console.warn("Error calculando altura:", error);
+      return 600;
+    }
+  }, [rf, nodes]);
+
+  // Recalcular altura cuando cambien los nodos
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      const newHeight = calculateHeight();
+      if (Math.abs(newHeight - flowHeight) > 50) { // Solo actualizar si hay cambio significativo
+        setFlowHeight(newHeight);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [nodes, calculateHeight, flowHeight]);
+
+  // Manejar el drag stop con recálculo
+  const handleNodeDragStop = useCallback((evt, node) => {
+    onNodeDragStop?.(evt, node);
+    
+    // Recalcular después del drag
+    setTimeout(() => {
+      const newHeight = calculateHeight();
+      setFlowHeight(newHeight);
+    }, 100);
+  }, [onNodeDragStop, calculateHeight]);
+
+  return (
+    <div style={{ 
+      height: flowHeight, 
+      minHeight: 600,
+      width: '100%',
+      position: 'relative'
+    }}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        onNodesChange={onNodesChange}
+        onConnect={onConnect}
+        onNodeDragStop={handleNodeDragStop}
+        onNodeClick={(_, n) => onNodeClick?.(n)}
+        onPaneClick={() => onPaneClick?.()}
+        fitView
+        fitViewOptions={{ padding: 0.3, duration: 300 }}
+        panOnScroll={false}
+        zoomOnScroll={true}
+        zoomOnDoubleClick={false}
+        panOnDrag
+        selectionOnDrag={false}
+        snapToGrid={false}
+        connectionMode={ConnectionMode.Loose}
+        defaultEdgeOptions={{ type: "bezier" }}
+        proOptions={{ hideAttribution: true }}
+        minZoom={0.2}
+        maxZoom={1.5}
+      >
+        <MiniMap 
+          zoomable 
+          pannable 
+          style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+          }}
+        />
+        <Controls />
+        <Background variant="lines" gap={24} size={1} />
+      </ReactFlow>
+    </div>
   );
 }

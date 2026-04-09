@@ -3,16 +3,18 @@ import { useEffect, useMemo, useState } from "react";
 import Header from "../ui/Header";
 import HistoryBar from "../history/HistoryBar";
 import { lazy, Suspense } from "react";
-const ModalSplit = lazy(() => import("../components/ui/ModalSplit"));
-const ModalFull = lazy(() => import("../components/ui/ModalFull"));
-const ModalEditNote = lazy(() => import("../components/ui/ModalEditNote"));
-import { useToast } from "../components/ui/ToastContext";
-const ConfirmModal = lazy(() => import("../components/ui/ConfirmModal"));
+const ModalSplit = lazy(() => import("../modals/ModalSplit"));
+const ModalFull = lazy(() => import("../modals/ModalFull"));
+const ModalEditNote = lazy(() => import("../modals/ModalEditNote"));
+import { useToast } from "../ui/ToastContext";
+const ConfirmModal = lazy(() => import("../modals/ConfirmModal"));
+import { CalendarDays } from "lucide-react";
+import { Link } from "react-router-dom";
 
-import { getNotes, updateNote, deleteNote } from "../DB/notes";
-import HistoryList from "../components/history/HistoryList";
+import { getNotes, updateNote, deleteNote } from "../db/notes";
+import HistoryList from "../history/HistoryList";
 
-import { parseMetaFromText } from "../utils/history";
+import { parseMetaFromText } from "../history/history";
 
 export default function History() {
   const [notes, setNotes] = useState([]);
@@ -222,6 +224,19 @@ export default function History() {
   return (
     <div className="min-h-screen surface pb-24">
       <Header />
+      {/* Botón de acceso al calendario de callbacks */}
+      <div className="mx-auto max-w-7xl px-4 pt-3 sm:px-6 lg:px-8">
+        <div className="flex justify-end">
+          <Link
+            to="/callbacks"
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            title="Ver callbacks (Follow Ups) en calendario"
+          >
+            <CalendarDays className="h-4 w-4" />
+            <span>Ver callbacks</span>
+          </Link>
+        </div>
+      </div>
 
       {/* Lista/Buscador/Meses-Días-Notas */}
       <HistoryList
@@ -249,11 +264,12 @@ export default function History() {
 
       <Suspense fallback={null}>
         {/* Split modal */}
-        <ModalSplit
-          open={showSplit}
-          onClose={() => setShowSplit(false)}
-          parts={parts} />
-        
+         <ModalSplit
+            open={showSplit}
+            onClose={() => setShowSplit(false)}
+            text={selectedNote?.text ?? selectedNote?.finalNoteText ?? ""}  /* ← siempre texto */
+            maxParts={3}
+          />     
 
         {/* Modal de lectura */}
         <ModalFull

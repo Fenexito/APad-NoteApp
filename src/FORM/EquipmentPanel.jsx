@@ -60,7 +60,7 @@ const PACKET_LOSS = [
 ];
 
 // COPPER GATEWAY MODELS (orden solicitado)
-const COPPER_GW_MODELS = ["T3200M", "T2200H", "T1200H"];
+const COPPER_GW_MODELS = ["T3200M", "T2200H", "T1200H", "3rd Party Gateway"];
 
 const LIGHT_COLORS = ["GREEN", "YELLOW", "ORANGE", "RED"];
 const DSL_TYPES = ["SINGLE", "BONDED"];
@@ -88,6 +88,7 @@ const FIBER_GW_MODELS = [
   "T3200M",
   "Telus Wifi Hub (TWH)",
   "Network Access Hub (NAH)",
+  "3rd Party Gateway",
 ];
 const FIBER_GW_LIGHTS = {
   "Network Access Hub (NAH)": ["SOLID GREEN", "FLASHING GREEN", "RED"],
@@ -100,6 +101,8 @@ const BOOSTER_MODELS = [
   "Boost Wifi 6E",
   "Boost Wifi 6E Mini",
   "Wifi 6E Extender",
+  "Boost Wifi 7",
+  "3rd Party Booster",
 ];
 const BOOSTER_LIGHTS = {
   WEB6000Q: [
@@ -108,11 +111,12 @@ const BOOSTER_LIGHTS = {
     "LAN 1-2 ON",
     "LAN 1-2 OFF",
   ],
-  "Boost V1": ["SOLID BLUE", "FLASHING BLUE", "RED"],
-  "Boost Wifi 6": ["SOLID GREEN", "FLASHING GREEN", "RED"],
-  "Boost Wifi 6E": ["SOLID GREEN", "FLASHING GREEN", "RED"],
-  "Boost Wifi 6E Mini": ["SOLID GREEN", "FLASHING GREEN", "RED"],
-  "Wifi 6E Extender": ["SOLID GREEN", "FLASHING GREEN", "FLASHING BLUE", "SOLID RED", "FLASHING RED",
+    "Boost V1": ["SOLID BLUE", "FLASHING BLUE", "RED"],
+    "Boost Wifi 6": ["SOLID GREEN", "FLASHING GREEN", "RED"],
+    "Boost Wifi 6E": ["SOLID GREEN", "FLASHING GREEN", "RED"],
+    "Boost Wifi 6E Mini": ["SOLID GREEN", "FLASHING GREEN", "RED"],
+    "Wifi 6E Extender": ["SOLID GREEN", "FLASHING GREEN", "FLASHING BLUE", "SOLID RED", "FLASHING RED"],
+    "Boost Wifi 7": ["SOLID GREEN", "FLASHING GREEN", "RED",
   ],
 };
 
@@ -383,19 +387,27 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
     // BOOSTER (ambos servicios → power unificado)
     if (isBooster(key)) {
       const model = state[key]?.model;
-      const obj = {
+      const base = {
         model: BOOSTER_MODELS,
+      };
+      // Si es 3rd Party Booster, solo nos interesa el modelo (no power / cables / luces)
+      if (model === "3rd Party Booster") {
+        return base;
+      }
+      const obj = {
+        ...base,
         power: POWER_OPTS_NET,
       };
       // WEB6000Q: sin CONNECTION (solo ethernet)
       // Boost V1: sin COAX/MOCA
       if (model !== "WEB6000Q") {
-        const base = ["ETHERNET", "COAX/MOCA", "WIRELESS"];
-        obj.conn = model === "Boost V1" ? base.filter((x) => x !== "COAX/MOCA") : base;
+        const baseConn = ["ETHERNET", "COAX/MOCA", "WIRELESS"];
+        obj.conn = model === "Boost V1" ? baseConn.filter((x) => x !== "COAX/MOCA") : baseConn;
       }
       if (model && BOOSTER_LIGHTS[model]) obj.lights = BOOSTER_LIGHTS[model];
+      // Si el BOOSTER está en conexión inalámbrica, permitir seleccionar "NO SIGNAL" en Wi-Fi
       if (state[key]?.internet === "WIRELESS" || state[key]?.conn === "WIRELESS") {
-        obj.wifi = WIFI_OPTS;
+        obj.wifi = ["NO SIGNAL", ...WIFI_OPTS];
       }
       return obj;
     }
@@ -444,11 +456,19 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
       return obj;
     }
 
-    // GATEWAY COPPER → power unificado
-    if (key === "gateway" && svc === "HighSpeed" && tchn === "copper") {
+    // GATEWAY COPPER → power unificado (incluye All Services copper)
+    if (key === "gateway" && ((svc === "HighSpeed" && tchn === "copper") || (svc === "All Services" && tchn === "copper"))) {
+      const model = state[key]?.model;
+      const baseModelOnly = {
+        model: COPPER_GW_MODELS,
+      };
+      // Si es 3rd Party Gateway, solo nos interesa el modelo
+      if (model === "3rd Party Gateway") {
+        return baseModelOnly;
+      }
       const dslSel = state[key]?.dsl;
       const obj = {
-        model: COPPER_GW_MODELS,
+        ...baseModelOnly,
         power: POWER_OPTS_NET,
         internetLight: LIGHT_COLORS,
         wifiLight: LIGHT_COLORS,
@@ -463,10 +483,15 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
       return obj;
     }
 
-    // GATEWAY FIBER (model-dependiente) → power unificado
-    if (key === "gateway" && svc === "HighSpeed" && tchn === "fiber") {
+    // GATEWAY FIBER (model-dependiente) → power unificado (incluye All Services≠copper)
+    if (key === "gateway" && ((svc === "HighSpeed" && tchn === "fiber") || (svc === "All Services" && tchn !== "copper"))) {
       const model = state[key]?.model;
-      const base = { model: FIBER_GW_MODELS, power: POWER_OPTS_NET };
+      const baseModelOnly = { model: FIBER_GW_MODELS };
+      // Si es 3rd Party Gateway, solo nos interesa el modelo (no power / cables / luces)
+      if (model === "3rd Party Gateway") {
+        return baseModelOnly;
+      }
+      const base = { ...baseModelOnly, power: POWER_OPTS_NET };
 
       if (model === "T3200M") {
         return {
@@ -496,8 +521,8 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
       return obj;
     }
 
-    // ONT (fibra): power unificado salvo modelos que lo omiten
-    if (key === "ont" && svc === "HighSpeed" && tchn === "fiber") {
+    // ONT (solo Fiber). En All Services, NO mostrar en copper.
+    if (key === "ont" && ((svc === "HighSpeed" && tchn === "fiber") || (svc === "All Services" && tchn !== "copper"))) {
       const model = state[key]?.model;
       const obj = { model: ONT_MODELS };
       const m = String(model || "").toUpperCase();
@@ -533,8 +558,11 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
 
   // Píldoras (lista horizontal)
   const equipments = useMemo(() => {
-    if (svc === "HighSpeed") {
-      const base = tchn === "fiber" ? [{ key: "ont", label: "ONT", icon: Server }] : [];
+    if (svc === "HighSpeed" || svc === "All Services") {
+      // ONT solo si es Fiber, o si es All Services PERO NO copper
+      const base = (tchn === "fiber" || (svc === "All Services" && tchn !== "copper"))
+        ? [{ key: "ont", label: "ONT", icon: Server }]
+        : [];
       const gw = [{ key: "gateway", label: "Gateway", icon: Router }];
       const dynB = Array.from({ length: boosters }, (_, i) => ({
         key: `booster${i}`,
@@ -575,14 +603,14 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
   const prev = useRef("");
   function orderedFieldListFor(key) {
     if (key === "ont") return ["model", "power", "lights"];
-    if (key === "gateway" && svc === "HighSpeed" && tchn === "fiber") {
+    if (key === "gateway" && ((svc === "HighSpeed" && tchn === "fiber") || (svc === "All Services" && tchn !== "copper"))) {
       const m = state[key]?.model;
       if (m === "T3200M" || m === "Telus Wifi Hub (TWH)") {
         return ["model", "power", "internetLight", "wifiLight", "wanPort"];
       }
       return ["model", "power", "conn", "lights", "wanPort"];
     }
-    if (key === "gateway" && svc === "HighSpeed" && tchn === "copper")
+    if (key === "gateway" && ((svc === "HighSpeed" && tchn === "copper") || (svc === "All Services" && tchn === "copper")))
       return ["model", "power", "internetLight", "wifiLight", "dsl", "dslLight"];
     if (isBoosterKey(key)) return ["model", "power", "conn", "lights", "wifi"];
     if (isLegacyPvr(key)) return ["model", "power", "hdmi", "internet", "linkLight", "xvuStatus", "packetLoss"];
@@ -592,22 +620,77 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
       return ["model", "power", "hdmi", "ethernet", "xvu", "packet"];
     return [];
   }
-  const formatSummaryValue = (field, value) => {
+  const formatSummaryValue = (field, value, deviceKey, model) => {
+    // Normaliza modelo a abreviaturas para el summary
+    const normModel = (() => {
+      if (!model) return model;
+      if (model === "Telus Wifi Hub (TWH)") return "TWH";
+      if (model === "Network Access Hub (NAH)") return "NAH";
+      return model;
+    })();
+
+    // CONNECTION → "Using Ethernet/Coax/Wireless"
+    if (field === "conn") {
+      if (String(value).toUpperCase() === "ETHERNET")  return "Using Ethernet";
+      if (String(value).toUpperCase() === "COAX/MOCA") return "Using Coax";
+      if (String(value).toUpperCase() === "WIRELESS")  return "Using Wireless";
+      return String(value);
+    }
+
+    // MODEL → abreviaturas
+    if (field === "model") {
+      return normModel || String(value);
+    }
+
+    // POWER → "Powered ON" cuando corresponda
+    if (field === "power") {
+      if (String(value) === "Power Connected / Powered ON") return "Powered ON";
+      return String(value);
+    }
+
+    // DSL → "Single Line"/"Bonded Line"
+    if (field === "dsl") {
+      const v = String(value).toUpperCase();
+      if (v === "SINGLE") return "Single Line";
+      if (v === "BONDED") return "Bonded Line";
+      return String(value);
+    }
+
+    // DSL LIGHT → "DSL LIGHT ON/OFF" | "BOTH DSL LIGHTS ON/OFF" | "1 DSL ON & 1 DSL OFF"
+    if (field === "dslLight") {
+      const raw = String(value).toUpperCase().trim();
+      if (raw.startsWith("BOTH")) {
+        // BOTH ON / BOTH OFF → "Both DSL Light ON/OFF"
+        const state = raw.replace(/^BOTH\s+/, ""); // quita el "BOTH "
+        return `Both DSL Light ${state}`;
+      }
+      if (raw === "1 ON & 1 OFF") return "1 DSL ON & 1 DSL OFF";
+      return `DSL Light ${raw}`;
+    }
+
+    // NAH (Gateway Fiber): lights → "Light SOLID GREEN", etc.
+    if (field === "lights" && deviceKey === "gateway" && (normModel === "NAH")) {
+      return `Light ${value}`;
+    }
+
+    // T3200M / TWH conservan prefijos por-luz
     if (field === "internetLight") return `Internet Light ${value}`;
-    if (field === "wifiLight") return `Wifi Light ${value}`;
+    if (field === "wifiLight")     return `Wifi Light ${value}`;
+
     return String(value);
   };
+
   useEffect(() => {
     const lines = Object.entries(state)
       .filter(([, v]) => v && Object.keys(v).length > 0)
       .map(([k, v]) => {
         const order = orderedFieldListFor(k);
         const picked = order
-          .map((f) => (v[f] ? formatSummaryValue(f, v[f]) : null))
+          .map((f) => (v[f] ? formatSummaryValue(f, v[f], k, v?.model) : null))
           .filter(Boolean);
         const remaining = Object.keys(v)
           .filter((f) => !order.includes(f))
-          .map((f) => formatSummaryValue(f, v[f]))
+          .map((f) => formatSummaryValue(f, v[f], k, v?.model))
           .filter(Boolean);
         const parts = [...picked, ...remaining];
         return `${deviceLabelForSummary(k)}: ${parts.join(" | ")}`;
@@ -636,7 +719,7 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
   const visible =
     svc === "HighSpeed"
       ? (tchn === "copper" || tchn === "fiber")
-      : svc.startsWith("Optik");
+      : (svc === "All Services" ? true : svc.startsWith("Optik"));
   if (!visible) return null;
 
   // Mutadores + saneos
@@ -644,8 +727,24 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
     setState((p) => {
       const next = { ...(p[k] || {}), [field]: val };
 
+      // Si POWER cambia a "No lights" o "Not Connected" → limpiar luces (state + SUMMARY)
+      if (field === "power") {
+        const v = String(val || "").toUpperCase();
+        const hide =
+          v === "POWER CONNECTED / NO LIGHTS" ||
+          v === "POWER NOT CONNECTED";
+        if (hide) {
+          ["lights", "internetLight", "wifiLight"].forEach((f) => {
+            if (
+              Object.prototype.hasOwnProperty.call(next, f) &&
+              next[f]
+            ) next[f] = "";
+          });
+        }
+      }
+
       // GATEWAY FIBER: dependiente del modelo
-      if (k === "gateway" && svc === "HighSpeed" && tchn === "fiber") {
+      if (k === "gateway" && ((svc === "HighSpeed" && tchn === "fiber") || (svc === "All Services" && tchn !== "copper"))) {
         if (field === "model") {
           const m = val;
           if (m === "T3200M" || m === "Telus Wifi Hub (TWH)") {
@@ -662,7 +761,7 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
       }
 
       // ONT: si cambia modelo y es G-010S-A o FXA5000 → sin POWER; reset lights por modelo
-      if (k === "ont" && svc === "HighSpeed" && tchn === "fiber") {
+      if (k === "ont" && ((svc === "HighSpeed" && tchn === "fiber") || svc === "All Services")) {
         if (field === "model") {
           const m = String(val || "").toUpperCase();
           if (m === "G-010S-A" || m === "FXA5000") {
@@ -692,6 +791,17 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
       return { ...p, [k]: next };
     });
   };
+
+  // Ocultar luces si el POWER está en "No lights" o "Not Connected"
+  const powerHidesLights = (devKey) => {
+    const v = String((state[devKey] || {}).power || "").toUpperCase();
+    return v === "POWER CONNECTED / NO LIGHTS" || v === "POWER NOT CONNECTED";
+  };
+  // Solo afecta a: lights / internetLight / wifiLight
+  // (NO oculta dslLight u otros campos)
+  const shouldHideField = (devKey, field) =>
+    powerHidesLights(devKey) &&
+    (field === "lights" || field === "internetLight" || field === "wifiLight");
 
   const clearDevice = (k) => setState((p) => ({ ...p, [k]: {} }));
 
@@ -750,6 +860,7 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
     if (level === "issues") return "Power Connected / No lights";
     return "Power not Connected";
   }
+  
   function buildPresetFor(key, type) {
     const cur = state[key] || {};
     const keepModel = cur.model;
@@ -762,10 +873,13 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
       if (field === "lights") {
         if (!keepModel) return;
         const list =
-          (key === "ont" ? ONT_LIGHTS[keepModel] :
-          key === "gateway" && svc === "HighSpeed" && tchn === "fiber"
-            ? FIBER_GW_LIGHTS[keepModel]
-            : null) || [];
+          (key === "ont"
+            ? ONT_LIGHTS[keepModel]
+            : (key === "gateway" && svc === "HighSpeed" && tchn === "fiber")
+              ? FIBER_GW_LIGHTS[keepModel]
+              : isBoosterKey(key)
+                ? BOOSTER_LIGHTS[keepModel]
+                : null) || [];
         if (!list.includes(value)) return;
       }
       obj[field] = value;
@@ -773,54 +887,43 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
 
     if (key === "ont") {
       const m = String(keepModel || "").toUpperCase();
-      if (!(m === "G-010S-A" || m === "FXA5000")) setIfExists(preset, "power", pickNetPower(level));
+      if (!(m === "G-010S-A" || m === "FXA5000")) setIfExists(preset, "power", "Power Connected / Powered ON");
       if (keepModel) setIfExists(preset, "lights", pickLightByPreference(ONT_LIGHTS, keepModel, prefer));
     } else if (key === "gateway" && svc === "HighSpeed") {
       if (tchn === "fiber") {
         const m = keepModel;
         if (m === "T3200M") {
-          setIfExists(preset, "power", pickNetPower(level));
+          setIfExists(preset, "power", "Power Connected / Powered ON");
           setIfExists(preset, "internetLight", level === "no" ? "RED" : level === "issues" ? "ORANGE" : "GREEN");
           setIfExists(preset, "wifiLight",     level === "no" ? "RED" : level === "issues" ? "YELLOW" : "GREEN");
-          setIfExists(preset, "wanPort",       level === "no" ? "WAN Not Connected" : "WAN Connected");
+          setIfExists(preset, "wanPort",       "WAN Connected");
         } else if (m === "Telus Wifi Hub (TWH)") {
-          setIfExists(preset, "power", pickNetPower(level));
+          setIfExists(preset, "power", "Power Connected / Powered ON");
           // respeta orden en opciones, pero aquí es un set directo
           setIfExists(preset, "internetLight", level === "no" ? "RED" : level === "issues" ? "FLASHING GREEN" : "SOLID GREEN");
           setIfExists(preset, "wifiLight",     level === "no" ? "RED" : level === "issues" ? "PURPLE" : "BLUE");
-          setIfExists(preset, "wanPort",       level === "no" ? "WAN Not Connected" : "Not Needed (SFP)");
+          setIfExists(preset, "wanPort",       "WAN Connected");
         } else {
           // NAH
-          setIfExists(preset, "power", pickNetPower(level));
-          setIfExists(preset, "conn",  level === "no" ? "COAX/MOCA" : "ETHERNET");
+          setIfExists(preset, "power", "Power Connected / Powered ON");
+          setIfExists(preset, "conn",  "ETHERNET");
           if (keepModel) setIfExists(preset, "lights", pickLightByPreference(FIBER_GW_LIGHTS, keepModel, prefer));
-          if (preset.conn === "ETHERNET") {
-            setIfExists(preset, "wanPort", level === "no" ? "WAN Not Connected" : "WAN Connected");
-          }
+          setIfExists(preset, "wanPort", "WAN Connected");
         }
       } else {
         // COPPER (usa el mismo set de POWER que fiber)
-        setIfExists(preset, "power", pickNetPower(level));
+        setIfExists(preset, "power", "Power Connected / Powered ON");
         setIfExists(preset, "internetLight", level === "no" ? "RED" : level === "issues" ? "ORANGE" : "GREEN");
-        setIfExists(preset, "wifiLight",     level === "no" ? "RED" : level === "issues" ? "YELLOW" : "GREEN");
-        setIfExists(preset, "dsl",       "SINGLE");
-        setIfExists(preset, "dslLight",  level === "no" ? "OFF" : level === "issues" ? "1 ON & 1 OFF" : "ON");
+        setIfExists(preset, "wifiLight", "GREEN");
+        setIfExists(preset, "dsl", "SINGLE");
+        setIfExists(preset, "dslLight", level === "ok" ? "ON" : "OFF");
       }
     } else if (isBoosterKey(key)) {
       // POWER unificado (cobre/fibra)
-      setIfExists(preset, "power", pickNetPower(level));
+      setIfExists(preset, "power", "Power Connected / Powered ON");
 
-      // Conexión respetando limitaciones de modelo:
-      // - WEB6000Q → sin "conn" (siempre Ethernet)
-      // - Boost V1 → NO COAX/MOCA
-      if (keepModel !== "WEB6000Q") {
-        const allowCoax = keepModel !== "Boost V1";
-        const targetConn =
-          level === "no"
-            ? (allowCoax ? "COAX/MOCA" : "ETHERNET")
-            : "ETHERNET";
-        setIfExists(preset, "conn", targetConn);
-      }
+      // Conexión fija a ETHERNET (si el equipo expone 'conn')
+      setIfExists(preset, "conn", "ETHERNET");
 
       // Luces por modelo (si aplica)
       if (keepModel)
@@ -837,7 +940,7 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
         if (level === "issues") setIfExists(preset, "wifi", "WEAK");
       }
     } else if (isLegacyPvr(key)) {
-      setIfExists(preset, "power", level === "no" ? "Power not Connected" : level === "issues" ? "Power Connected / No lights" : "Power Connected / Powered ON");
+      setIfExists(preset, "power", "Power Connected / Powered ON");
       setIfExists(preset, "hdmi",  level === "issues" ? "HDMI Connected / Wrong Input" : "HDMI Connected / Input selected");
       setIfExists(preset, "internet", "Wired to T3200M");
       setIfExists(preset, "linkLight", level === "no" ? "FLASHING" : "SOLID");
@@ -848,7 +951,7 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
         setIfExists(preset, "packetLoss", "No Packet Loss");
       }
     } else if (isLegacyStb(key)) {
-      setIfExists(preset, "power", level === "no" ? "Power not Connected" : level === "issues" ? "Power Connected / No lights" : "Power Connected / Powered ON");
+      setIfExists(preset, "power", "Power Connected / Powered ON");
       setIfExists(preset, "hdmi",  level === "issues" ? "HDMI Connected / Wrong Input" : "HDMI Connected / Input selected");
       if (level === "no") {
         setIfExists(preset, "internet", "Non WIRED/WIRELESS");
@@ -867,7 +970,7 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
         setIfExists(preset, "packetLoss", "Too Many Packet Loss");
       }
     } else if (isDigital(key)) {
-      setIfExists(preset, "power", level === "no" ? "Power not Connected" : level === "issues" ? "Power Connected / No lights" : "Power Connected / Powered ON");
+      setIfExists(preset, "power", "Power Connected / Powered ON");
       setIfExists(preset, "hdmi",  level === "issues" ? "HDMI Connected / Wrong Input" : "HDMI Connected / Input selected");
       if (level === "no") {
         setIfExists(preset, "internet", "Non WIRED/WIRELESS");
@@ -878,7 +981,7 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
         setIfExists(preset, "bootLoop", "NO");
       }
     } else if (svc === "HighSpeed" && String(key).startsWith("stb")) {
-      setIfExists(preset, "power", level === "no" ? "Off" : "On");
+      setIfExists(preset, "power", "Power Connected / Powered ON");
       setIfExists(preset, "hdmi",  level === "issues" ? "Wrong Input" : "Correct Input");
       setIfExists(preset, "ethernet", level === "no" ? "Wi-Fi" : "Wired");
       setIfExists(preset, "xvu",   level === "no" ? "Present" : "None");
@@ -920,6 +1023,7 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
     const Icon = item.icon;
     const isAdd = item.key.startsWith("add");
     const selected = active === item.key;
+    const complete = isComplete(item.key);
 
     if (isAdd) {
       const onAdd = () => {
@@ -953,11 +1057,16 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
     return (
       <button
         type="button"
-        onClick={() => setActive(item.key)}
+        onClick={() => setActive((cur) => (cur === item.key ? null : item.key))}
+        aria-expanded={active === item.key}
         className={`relative inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] transition
-          ${selected
-            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
-            : "border-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"}`}
+            ${complete
+              ? (selected
+                  ? "border-green-600 bg-green-50 ring-1 ring-green-600 dark:bg-green-900/30"
+                  : "border-green-600 bg-white hover:bg-green-50/50 dark:bg-gray-500 dark:hover:bg-green-900/20")
+              : (selected
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
+                  : "border-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700")}`}
         title={item.label}
       >
         <Icon size={14} />
@@ -1092,7 +1201,9 @@ export default function EquipmentPanel({ tech, service, summary, onSummaryChange
 
         {/* Campos en grid */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {Object.entries(fields).map(([field, opts]) => {
+          {Object.entries(fields)
+            .filter(([field]) => !shouldHideField(active, field))
+            .map(([field, opts]) => {
             const isModel = field === "model";
             return (
               <FieldGroup key={field} label={field}>

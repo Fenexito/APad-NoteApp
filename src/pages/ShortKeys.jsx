@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
-import Header from "../components/ui/Header";
+import Header from "../ui/Header";
 import ButtonsShortkeys from "../SHORTKEYS/ButtonsShortkeys";
 
 import {
@@ -13,7 +13,7 @@ import {
 "../SHORTKEYS/store";
 import ShortkeyList from "../SHORTKEYS/ShortkeyList";
 import ShortkeyEditor from "../SHORTKEYS/ShortkeyEditor";
-import ConfirmModal from "../components/ui/ConfirmModal";
+import ConfirmModal from "../modals/ConfirmModal";
 
 export default function ShortKeys() {
   const navigate = useNavigate();

@@ -1,6 +1,6 @@
 // src/shortkeys/ShortkeyList.jsx
 import React, { useMemo, useState, useEffect } from "react";
-import { ChevronRight, Search, X, Minimize, StretchVertical } from "lucide-react";
+import { ChevronRight, Search, X, Minimize, StretchVertical, Upload, Download } from "lucide-react";
 
 /* ========= Density toggle ========= */
 function useDensity() {
@@ -292,7 +292,7 @@ export default function ShortkeyList({
         {/* Search */}
         <div
           className="
-            relative flex flex-1 items-center
+            relative flex flex-1 min-w-0 items-center
             rounded-full border border-blue-100/60 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 backdrop-blur
             shadow-sm focus-within:ring-2 focus-within:ring-blue-300
           "
@@ -326,30 +326,31 @@ export default function ShortkeyList({
         </div>
 
         {/* Density */}
-        <DensityToggle density={density} onChange={setDensity} />
+        <div className="shrink-0">
+          <DensityToggle density={density} onChange={setDensity} />
+        </div>
 
-        {/* Acciones rápidas */}
-        <div className="hidden sm:flex items-center gap-2">
+        {/* Acciones rápidas (siempre visibles) */}
+        <div className="flex items-center gap-1 ml-1 shrink-0">
+          {/* Export (verde, icon-only) */}
           <button
-            className="inline-flex items-center rounded-xl bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-800"
-            onClick={onAdd}
-            title="Add new shortkey"
-          >
-            + New
-          </button>
-          <button
-            className="inline-flex items-center rounded-xl border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
             onClick={onExport}
+            className="inline-flex items-center justify-center p-1.5 rounded-full border border-emerald-200 bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100/70 dark:border-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200 dark:hover:bg-emerald-900/60 transition"
             title="Export JSON"
+            aria-label="Export JSON"
+            type="button"
           >
-            Export
+            <Download size={14} />
           </button>
+          {/* Import (morado, icon-only) */}
           <button
-            className="inline-flex items-center rounded-xl border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
             onClick={onImport}
+            className="inline-flex items-center justify-center p-1.5 rounded-full border border-violet-200 bg-violet-50/70 text-violet-700 hover:bg-violet-100/70 dark:border-violet-700 dark:bg-violet-900/40 dark:text-violet-200 dark:hover:bg-violet-900/60 transition"
             title="Import JSON"
+            aria-label="Import JSON"
+            type="button"
           >
-            Import
+            <Upload size={14} />
           </button>
         </div>
       </div>
